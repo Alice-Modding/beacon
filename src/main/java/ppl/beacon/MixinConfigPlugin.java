@@ -9,10 +9,8 @@ import java.util.List;
 import java.util.Set;
 
 public class MixinConfigPlugin implements IMixinConfigPlugin {
-    private final boolean hasSodium = true;
-    private final boolean hasStarlight = false;
-//    private final boolean hasSodium = FabricLoader.getInstance().isModLoaded("sodium");
-//    private final boolean hasStarlight = FabricLoader.getInstance().isModLoaded("starlight");
+    private final boolean hasSodium = FabricLoader.getInstance().isModLoaded("sodium");
+    private final boolean hasStarlight = FabricLoader.getInstance().isModLoaded("starlight");
 
     @Override
     public void onLoad(String mixinPackage) {
