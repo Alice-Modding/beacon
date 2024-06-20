@@ -23,6 +23,14 @@ public class FileSystemUtils {
         return parent.resolve(FALLBACK_NAME_ENCODER.escape(name));
     }
 
+    public static boolean oldFolderExists(Path path, String name) {
+        try {
+            return Files.exists(path.resolve(name));
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
     /**
      * Checks whether a given directory name is actually usable with the file system / operating system in the given parent folder.
      */

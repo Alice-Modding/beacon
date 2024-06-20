@@ -1,7 +1,7 @@
 package ppl.beacon.fake.chunk;
 
+import com.google.common.hash.Hashing;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
 import net.minecraft.SharedConstants;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -12,8 +12,6 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.structure.StructureContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -25,15 +23,9 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
 import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.LightingProvider;
-import net.minecraft.world.gen.GenerationStep;
-import net.minecraft.world.gen.carver.CarvingMask;
-import net.minecraft.world.gen.chunk.BlendingData;
-import net.minecraft.world.poi.PointOfInterestStorage;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import ppl.beacon.BeaconMod;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import ppl.beacon.config.Config;
-import ppl.beacon.config.RanderConfig;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
 import ppl.beacon.fake.ext.LightingProviderExt;
 
@@ -41,6 +33,7 @@ import java.util.*;
 import java.util.function.Supplier;
 
 public class FakeChunkSerializer extends ChunkSerializer {
+    private static final Logger LOGGER = LogManager.getLogger();
 
     private static final ChunkNibbleArray COMPLETELY_DARK = new ChunkNibbleArray();
     private static final ChunkNibbleArray COMPLETELY_LIT = new ChunkNibbleArray();
@@ -50,6 +43,10 @@ public class FakeChunkSerializer extends ChunkSerializer {
             PalettedContainer.PaletteProvider.BLOCK_STATE,
             Blocks.AIR.getDefaultState()
     );
+
+    private static void logRecoverableError(ChunkPos chunkPos, int y, String message) {
+        LOGGER.error("Recoverable errors when loading section [" + chunkPos.x + ", " + y + ", " + chunkPos.z + "]: " + message);
+    }
 
     private static Codec<ReadableContainer<RegistryEntry<Biome>>> getBiomCodec(DynamicRegistryManager registryManager) {
         Registry<Biome> biomeRegistry = registryManager.get(RegistryKeys.BIOME);
@@ -171,23 +168,19 @@ public class FakeChunkSerializer extends ChunkSerializer {
         return nbtCompound;
     }
 
-    public static Pair<WorldChunk, Supplier<WorldChunk>> deserialize(ChunkPos pos, NbtCompound nbtCompound, World world, PointOfInterestStorage poiStorage) {
+    public static FakeChunk deserialize(ChunkPos pos, NbtCompound nbtCompound, World world) {
         NbtList section = nbtCompound.getList(SECTIONS_KEY, NbtElement.COMPOUND_TYPE);
         ChunkSection[] chunkSections = new ChunkSection[world.countVerticalSections()];
-        ChunkNibbleArray[] blockLight = new ChunkNibbleArray[chunkSections.length + 2];
-        ChunkNibbleArray[] skyLight = new ChunkNibbleArray[chunkSections.length + 2];
 
 
         ChunkPos chunkPos = new ChunkPos(nbtCompound.getInt("xPos"), nbtCompound.getInt("zPos"));
         if (!Objects.equals(pos, chunkPos)) {
-            // ERROR
+            LOGGER.error("Chunk file at {} is in the wrong location; relocating. (Expected {}, got {})", pos, pos, chunkPos);
         }
-
 
         DynamicRegistryManager registryManager = world.getRegistryManager();
         Registry<Biome> biomeRegistry = registryManager.get(RegistryKeys.BIOME);
         Codec<PalettedContainer<RegistryEntry<Biome>>> biomeCodec = getPalettedBiomCodec(biomeRegistry);
-        Arrays.fill(blockLight, COMPLETELY_DARK);
         for (int i = 0; i < section.size(); i++) {
             NbtCompound sectionNbt = section.getCompound(i);
             int y = sectionNbt.getByte("Y");
@@ -216,10 +209,47 @@ public class FakeChunkSerializer extends ChunkSerializer {
 
             ChunkSection chunkSection = new ChunkSection(blocks, biomes);
             chunkSection.calculateCounts();
-            if (!chunkSection.isEmpty()) {
-                chunkSections[l] = chunkSection;
-                poiStorage.initForPalette(ChunkSectionPos.from(chunkPos, y), chunkSection);
+            if (!chunkSection.isEmpty()) chunkSections[l] = chunkSection;
+        }
+
+        FakeChunk chunk = new FakeChunk(world, pos, chunkSections);
+
+        NbtCompound heightmaps = nbtCompound.getCompound(HEIGHTMAPS_KEY);
+        EnumSet<Heightmap.Type> missingHightmapTypes = EnumSet.noneOf(Heightmap.Type.class);
+
+        for (Heightmap.Type type : chunk.getStatus().getHeightmapTypes()) {
+            String key = type.getName();
+            if (heightmaps.contains(key, NbtElement.LONG_ARRAY_TYPE)) {
+                chunk.setHeightmap(type, heightmaps.getLongArray(key));
+            } else {
+                missingHightmapTypes.add(type);
             }
+        }
+
+        Heightmap.populateHeightmaps(chunk, missingHightmapTypes);
+
+        if (!Config.renderer.isNoBlockEntities()) {
+            NbtList blockEntitiesTag = nbtCompound.getList("block_entities", NbtElement.COMPOUND_TYPE);
+            for (int i = 0; i < blockEntitiesTag.size(); i++) {
+                chunk.addPendingBlockEntityNbt(blockEntitiesTag.getCompound(i));
+            }
+        }
+        return chunk;
+    }
+
+    public static Supplier<WorldChunk> deserialize(FakeChunk chunk, NbtCompound nbtCompound, World world) {
+        NbtList section = nbtCompound.getList(SECTIONS_KEY, NbtElement.COMPOUND_TYPE);
+        ChunkSection[] chunkSections = new ChunkSection[world.countVerticalSections()];
+        ChunkNibbleArray[] blockLight = new ChunkNibbleArray[chunkSections.length + 2];
+        ChunkNibbleArray[] skyLight = new ChunkNibbleArray[chunkSections.length + 2];
+
+        Arrays.fill(blockLight, COMPLETELY_DARK);
+        for (int i = 0; i < section.size(); i++) {
+            NbtCompound sectionNbt = section.getCompound(i);
+            int y = sectionNbt.getByte("Y");
+            int l = world.sectionCoordToIndex(y);
+
+            if (l < -1 || l > chunkSections.length) continue;
 
             if (sectionNbt.contains("BlockLight", NbtElement.BYTE_ARRAY_TYPE)) {
                 blockLight[l + 1] = new ChunkNibbleArray(sectionNbt.getByteArray("BlockLight"));
@@ -256,39 +286,14 @@ public class FakeChunkSerializer extends ChunkSerializer {
             skyLight[y] = inferredSection;
         }
 
-        FakeChunk chunk = new FakeChunk(world, pos, chunkSections);
-
-        NbtCompound heightmaps = nbtCompound.getCompound(HEIGHTMAPS_KEY);
-        EnumSet<Heightmap.Type> missingHightmapTypes = EnumSet.noneOf(Heightmap.Type.class);
-
-        for (Heightmap.Type type : chunk.getStatus().getHeightmapTypes()) {
-            String key = type.getName();
-            if (heightmaps.contains(key, NbtElement.LONG_ARRAY_TYPE)) {
-                chunk.setHeightmap(type, heightmaps.getLongArray(key));
-            } else {
-                missingHightmapTypes.add(type);
-            }
-        }
-
-        Heightmap.populateHeightmaps(chunk, missingHightmapTypes);
-
-        RanderConfig config = Config.renderer;
-        if (!config.isNoBlockEntities()) {
-            NbtList blockEntitiesTag = nbtCompound.getList("block_entities", NbtElement.COMPOUND_TYPE);
-            for (int i = 0; i < blockEntitiesTag.size(); i++) {
-                chunk.addPendingBlockEntityNbt(blockEntitiesTag.getCompound(i));
-            }
-        }
-
-        return Pair.of(chunk, loadChunk(chunk, blockLight, skyLight, config));
+        return loadChunk(chunk, blockLight, skyLight);
     }
 
 
-    private static Supplier<WorldChunk> loadChunk(
+    public static Supplier<WorldChunk> loadChunk(
             FakeChunk chunk,
             ChunkNibbleArray[] blockLight,
-            ChunkNibbleArray[] skyLight,
-            RanderConfig config
+            ChunkNibbleArray[] skyLight
     ) {
         return () -> {
             ChunkPos pos = chunk.getPos();
@@ -296,23 +301,22 @@ public class FakeChunkSerializer extends ChunkSerializer {
             ChunkSection[] chunkSections = chunk.getSectionArray();
 
             boolean hasSkyLight = world.getDimension().hasSkyLight();
-            ChunkManager chunkManager = world.getChunkManager();
-            LightingProvider lightingProvider = chunkManager.getLightingProvider();
-            LightingProviderExt lightingProviderExt = LightingProviderExt.get(lightingProvider);
+
+            LightingProvider lightingProvider = world.getChunkManager().getLightingProvider();
+            LightingProviderExt.get(lightingProvider).beacon$enabledColumn(pos.toLong());
+
             ChunkLightProviderExt blockLightProvider = ChunkLightProviderExt.get(lightingProvider.get(LightType.BLOCK));
             ChunkLightProviderExt skyLightProvider = ChunkLightProviderExt.get(lightingProvider.get(LightType.SKY));
-
-            lightingProviderExt.enabledColumn(pos.toLong());
 
             for (int i = -1; i < chunkSections.length + 1; i++) {
                 int y = world.sectionIndexToCoord(i);
                 if (blockLightProvider != null)
-                    blockLightProvider.addSectionData(ChunkSectionPos.from(pos, y).asLong(), blockLight[i + 1]);
+                    blockLightProvider.beacon$addSectionData(ChunkSectionPos.from(pos, y).asLong(), blockLight[i + 1]);
                 if (skyLightProvider != null && hasSkyLight)
-                    skyLightProvider.addSectionData(ChunkSectionPos.from(pos, y).asLong(), skyLight[i + 1]);
+                    skyLightProvider.beacon$addSectionData(ChunkSectionPos.from(pos, y).asLong(), skyLight[i + 1]);
             }
 
-            chunk.setTinted(config.isTintFakeChunks());
+            chunk.setTinted(Config.renderer.isTintFakeChunks());
 
             // MC lazily loads block entities when they are first accessed.
             // It does so in a thread-unsafe way though, so if they are first accessed from e.g. a render thread, this
@@ -329,8 +333,59 @@ public class FakeChunkSerializer extends ChunkSerializer {
     }
 
 
-    private static void logRecoverableError(ChunkPos chunkPos, int y, String message) {
-        LOGGER.error("Recoverable errors when loading section [" + chunkPos.x + ", " + y + ", " + chunkPos.z + "]: " + message);
+    /**
+     * Computes a fingerprint for the blocks in the given chunk.
+     *
+     * Merely differentiates between opaque and non-opaque block, so should be fairly fast and stable across Minecraft
+     * versions.
+     *
+     * Never returns 0 (so it may be used to indicate an absence of a value).
+     * Returns 1 if the chunk does not contain enough entropy to reliably match against other chunks (e.g. flat world
+     * chunk without any notable structure).
+     */
+    public static long fingerprint(WorldChunk chunk) {
+        ChunkSection[] sectionArray = chunk.getSectionArray();
+
+        BitSet opaqueBlocks = new BitSet(sectionArray.length * 16 * 16 * 16);
+
+        // We consider a chunk low quality (and return 1) if there are no y layers that have mixed content.
+        // I.e. each 16x16x1 layer is either completely filled or completely empty.
+        boolean lowQuality = true;
+
+        int i = 0;
+        for (ChunkSection chunkSection : sectionArray) {
+            if (chunkSection == null) {
+                i += 16 * 16 * 16;
+                continue;
+            }
+            PalettedContainer<BlockState> container = chunkSection.getBlockStateContainer();
+            for (int y = 0; y < 16; y++) {
+                int opaqueCount = 0;
+
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        BlockState blockState = container.get(x, y, z);
+                        if (blockState.isOpaque()) {
+                            opaqueBlocks.set(i);
+                            opaqueCount++;
+                        }
+                        i++;
+                    }
+                }
+
+                if (lowQuality && opaqueCount > 0 && opaqueCount < 16 * 16) {
+                    lowQuality = false;
+                }
+            }
+        }
+
+        if (lowQuality) return 1;
+
+        long fingerprint = Hashing.farmHashFingerprint64().hashBytes(opaqueBlocks.toByteArray()).asLong();
+        // 0 and 1 are reserved
+        return (fingerprint == 0 || fingerprint == 1) ? fingerprint + 2 : fingerprint;
     }
+
+
 
 }

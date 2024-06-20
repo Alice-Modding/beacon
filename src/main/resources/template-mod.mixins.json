@@ -4,6 +4,23 @@
 	"compatibilityLevel": "JAVA_21",
 	"plugin": "ppl.beacon.MixinConfigPlugin",
 	"mixins": [
+		"option.BackgroundRendererMixin",
+		"option.ClientSettingsC2SPacketMixin",
+		"option.GameOptionsMixin",
+		"option.IntegratedServerMixin",
+		"option.SimpleOptionAccessor",
+		"option.ValidatingIntSliderCallbacksAccessor",
+		"option.WorldRendererMixin",
+
+		"rander.replacer.ChunkLightProviderMixin",
+		"rander.replacer.ClientChunkManagerMixin",
+		"rander.replacer.LightingProviderMixin",
+
+		"rander.GameRendererMixin",
+		"rander.MinecraftClientMixin",
+
+		"world.BiomeAccessAccessor",
+		"world.ClientWorldAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

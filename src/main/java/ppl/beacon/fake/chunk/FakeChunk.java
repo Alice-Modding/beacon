@@ -4,19 +4,23 @@ import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.fluid.Fluid;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.*;
-import net.minecraft.world.chunk.light.ChunkLightProvider;
+import net.minecraft.world.chunk.light.ChunkLightingView;
 import net.minecraft.world.chunk.light.LightingProvider;
-import net.minecraft.world.gen.chunk.BlendingData;
 import net.minecraft.world.tick.ChunkTickScheduler;
-import org.jetbrains.annotations.Nullable;
+import ppl.beacon.config.Config;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
+
+import java.util.Map;
 
 public class FakeChunk extends WorldChunk {
     private boolean is_tinted;
@@ -25,8 +29,40 @@ public class FakeChunk extends WorldChunk {
     public ChunkNibbleArray[] skyLight;
     public NbtList serializedBlockEntities;
 
-    public FakeChunk(World world, ChunkPos pos, ChunkSection[] sections) {
-        super(world, pos, UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<Block>(), new ChunkTickScheduler<Fluid>(), 0L, sections, null, null);
+    public FakeChunk(World world, ChunkPos chunkPos, ChunkSection[] sections) {
+        super(world, chunkPos, UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<Block>(), new ChunkTickScheduler<Fluid>(), 0L, sections, null, null);
+    }
+
+    public FakeChunk(WorldChunk real) {
+        super(real.getWorld(), real.getPos(), UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<Block>(), new ChunkTickScheduler<Fluid>(), 0L, real.getSectionArray(), null, null);
+
+        blockLight = new ChunkNibbleArray[getSectionArray().length + 2];
+        skyLight = new ChunkNibbleArray[getSectionArray().length + 2];
+
+        LightingProvider lightingProvider = getWorld().getChunkManager().getLightingProvider();
+        ChunkLightingView blockLightView= lightingProvider.get(LightType.BLOCK);
+        ChunkLightingView skyLightView = lightingProvider.get(LightType.SKY);
+
+
+        for (int y = lightingProvider.getBottomY(), i = 0; y < lightingProvider.getTopY(); y++, i++) {
+            blockLight[i] = blockLightView.getLightSection(ChunkSectionPos.from(pos, y));
+            skyLight[i] = skyLightView.getLightSection(ChunkSectionPos.from(pos, y));
+        }
+
+        for (Map.Entry<Heightmap.Type, Heightmap> entry : real.getHeightmaps()) {
+            heightmaps.put(entry.getKey(), entry.getValue());
+        }
+
+        NbtList blockEntitiesTag = new NbtList();
+        DynamicRegistryManager register = getWorld().getRegistryManager();
+        for (BlockPos pos : real.getBlockEntityPositions()) {
+            NbtCompound blockEntityTag = real.getPackedBlockEntityNbt(pos, register);
+            if (blockEntityTag == null) continue;
+
+            blockEntitiesTag.add(blockEntityTag);
+            if (!Config.renderer.isNoBlockEntities()) addPendingBlockEntityNbt(blockEntityTag);
+        }
+        serializedBlockEntities = blockEntitiesTag;
     }
 
     public void setTinted(boolean tinted) {
@@ -54,6 +90,6 @@ public class FakeChunk extends WorldChunk {
 
     private void updateTintedState(ChunkLightProviderExt lightProvider, int y, int delta) {
         if (lightProvider == null) return;
-        lightProvider.setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), delta);
+        lightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), delta);
     }
 }
