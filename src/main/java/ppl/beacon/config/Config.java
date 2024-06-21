@@ -83,20 +83,14 @@ public class Config {
         }
 
         private void setEnabled(boolean enabled) {
-            if (wasEnabled == enabled) {
-                return;
-            }
+            if (wasEnabled == enabled) return;
             wasEnabled = enabled;
 
             ClientWorld world = client.world;
-            if (world == null) {
-                return;
-            }
+            if (world == null) return;
 
             FakeChunkManager bobbyChunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
-            if (bobbyChunkManager == null) {
-                return;
-            }
+            if (bobbyChunkManager == null) return;
 
             for (WorldChunk fakeChunk : bobbyChunkManager.getFakeChunks()) {
                 ((FakeChunk) fakeChunk).setTinted(enabled);

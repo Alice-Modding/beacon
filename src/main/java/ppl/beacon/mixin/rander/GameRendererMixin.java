@@ -32,7 +32,7 @@ public abstract class GameRendererMixin {
 
         this.client.getProfiler().push("bobbyUpdate");
 
-        chunkManager.update(true, () -> true);
+        chunkManager.update(() -> true);
 
         this.client.getProfiler().pop();
     }

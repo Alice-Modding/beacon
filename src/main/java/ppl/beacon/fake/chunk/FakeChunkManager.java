@@ -146,11 +146,11 @@ public class FakeChunkManager {
         return worlds;
     }
 
-    public void update(boolean blocking, BooleanSupplier shouldKeepTicking) {
-        update(blocking, shouldKeepTicking, client.options.getViewDistance().getValue());
+    public void update(BooleanSupplier shouldKeepTicking) {
+        update(shouldKeepTicking, client.options.getViewDistance().getValue());
     }
 
-    private void update(boolean blocking, BooleanSupplier shouldKeepTicking, int newViewDistance) {
+    private void update(BooleanSupplier shouldKeepTicking, int newViewDistance) {
         // Once a minute, force chunks to disk
         if (++ticksSinceLastSave > 20 * 60) {
             // completeAll is blocking, so we run it on the io pool
@@ -184,9 +184,7 @@ public class FakeChunkManager {
             // Not removing it from [unloadQueue], we check [toBeUnloaded] when we poll it.
 
             // If there already is a chunk loaded, there's nothing to do
-            if (clientChunkManager.getChunk(x, z, ChunkStatus.FULL, false) != null) {
-                return;
-            }
+            if (clientChunkManager.getChunk(x, z, ChunkStatus.FULL, false) != null) return;
 
             // All good, load it
             int distanceX = Math.abs(x - newCenterX);
@@ -208,9 +206,8 @@ public class FakeChunkManager {
         int countSinceLastThrottleCheck = 0;
         while (true) {
             Pair<Long, Long> next = unloadQueue.pollFirst();
-            if (next == null) {
-                break;
-            }
+            if (next == null) break;
+
             long chunkPos = next.getLeft();
             long queuedTime = next.getRight();
 
@@ -237,31 +234,16 @@ public class FakeChunkManager {
 
             if (countSinceLastThrottleCheck++ > 10) {
                 countSinceLastThrottleCheck = 0;
-                if (!shouldKeepTicking.getAsBoolean()) {
-                    break;
-                }
+                if (!shouldKeepTicking.getAsBoolean()) break;
             }
         }
 
         ObjectIterator<FingerprintJob> fingerprintJobsIter = this.fingerprintJobs.values().iterator();
-        jobs: while (fingerprintJobsIter.hasNext()) {
+        while (fingerprintJobsIter.hasNext()) {
             FingerprintJob fingerprintJob = fingerprintJobsIter.next();
 
-            while (fingerprintJob.result == 0) {
-                // Still loading, should we wait for it?
-                if (blocking) {
-                    try {
-                        // This code path is not the default one, it doesn't need super high performance, and having the
-                        // workers notify the main thread just for it is probably not worth it.
-                        //noinspection BusyWait
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    continue jobs;
-                }
-            }
+            // Still loading, should we wait for it?
+            if (fingerprintJob.result == 0) continue;
 
             // Done loading
             fingerprintJobsIter.remove();
@@ -271,32 +253,16 @@ public class FakeChunkManager {
 
             if (countSinceLastThrottleCheck++ > 10) {
                 countSinceLastThrottleCheck = 0;
-                if (!shouldKeepTicking.getAsBoolean()) {
-                    break;
-                }
+                if (!shouldKeepTicking.getAsBoolean()) break;
             }
         }
 
         ObjectIterator<LoadingJob> loadingJobsIter = this.loadingJobs.values().iterator();
-        jobs: while (loadingJobsIter.hasNext()) {
+        while (loadingJobsIter.hasNext()) {
             LoadingJob loadingJob = loadingJobsIter.next();
 
-            //noinspection OptionalAssignedToNull
-            while (loadingJob.result == null) {
-                // Still loading, should we wait for it?
-                if (blocking) {
-                    try {
-                        // This code path is not the default one, it doesn't need super high performance, and having the
-                        // workers notify the main thread just for it is probably not worth it.
-                        //noinspection BusyWait
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    continue jobs;
-                }
-            }
+            // Still loading, should we wait for it?
+            if (loadingJob.result.isEmpty()) continue;
 
             // Done loading
             loadingJobsIter.remove();
@@ -305,9 +271,7 @@ public class FakeChunkManager {
             loadingJob.complete();
             client.getProfiler().pop();
 
-            if (!shouldKeepTicking.getAsBoolean()) {
-                break;
-            }
+            if (!shouldKeepTicking.getAsBoolean()) break;
         }
 
         if (worlds != null) {
@@ -321,8 +285,8 @@ public class FakeChunkManager {
         // We do this by temporarily reducing the client view distance to 0. That will unload all chunks and then try
         // to re-load them (by canceling the unload when they were already loaded, or from the cache when they are
         // missing).
-        update(false, () -> false, 0);
-        update(false, () -> false);
+        update(() -> false, 0);
+        update(() -> false);
     }
 
     public boolean shouldBeLoaded(int x, int z) {
@@ -397,12 +361,11 @@ public class FakeChunkManager {
 
     public Supplier<WorldChunk> saveChunk(FakeChunk chunk) {
         fingerprint(chunk);
+        LightingProvider lightingProvider = chunk.getWorld().getLightingProvider();
         FakeStorage storage = worlds != null ? worlds.getCurrentStorage() : this.storage;
-        saveExecutor.execute(() -> {
-            NbtCompound nbt = FakeChunkSerializer.serialize(chunk, chunk.getWorld().getLightingProvider());
-            nbt.putLong("age", System.currentTimeMillis()); // fallback in case meta gets corrupted
-            storage.saveChunk(chunk.getPos(), nbt);
-        });
+        NbtCompound nbt = FakeChunkSerializer.serialize(chunk, lightingProvider);
+        nbt.putLong("age", System.currentTimeMillis()); // fallback in case meta gets corrupted
+        saveExecutor.execute(() -> storage.saveChunk(chunk.getPos(), nbt));
         return FakeChunkSerializer.loadChunk(chunk, chunk.blockLight, chunk.skyLight);
     }
 

@@ -31,11 +31,11 @@ public class FakeChunk extends WorldChunk {
     public NbtList serializedBlockEntities;
 
     public FakeChunk(World world, ChunkPos chunkPos, ChunkSection[] sections) {
-        super(world, chunkPos, UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<Block>(), new ChunkTickScheduler<Fluid>(), 0L, sections, null, null);
+        super(world, chunkPos, UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<>(), new ChunkTickScheduler<>(), 0L, sections, null, null);
     }
 
     public FakeChunk(WorldChunk real) {
-        super(real.getWorld(), real.getPos(), UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<Block>(), new ChunkTickScheduler<Fluid>(), 0L, real.getSectionArray(), null, null);
+        super(real.getWorld(), real.getPos(), UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<>(), new ChunkTickScheduler<>(), 0L, real.getSectionArray(), null, null);
 
         blockLight = new ChunkNibbleArray[getSectionArray().length + 2];
         skyLight = new ChunkNibbleArray[getSectionArray().length + 2];
@@ -81,16 +81,16 @@ public class FakeChunk extends WorldChunk {
         double gamma = client.options.getGamma().getValue();
         int skyDelta = tinted ? -3 + (int) (-7 * gamma) : 0;
 
-        for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++) {
-            updateTintedState(blockLightProvider, y, blockDelta);
-            updateTintedState(skyLightProvider, y, skyDelta);
+        if (blockLightProvider == null)
+            for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
+                blockLightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), blockDelta);
 
+        if (skyLightProvider == null)
+            for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
+                skyLightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), skyDelta);
+
+
+        for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
             worldRenderer.scheduleBlockRender(this.pos.x, y, this.pos.z);
-        }
-    }
-
-    private void updateTintedState(ChunkLightProviderExt lightProvider, int y, int delta) {
-        if (lightProvider == null) return;
-        lightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), delta);
     }
 }
