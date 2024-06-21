@@ -6,7 +6,6 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.util.math.ChunkPos;
 import ppl.beacon.fake.chunk.storage.FakeStorage;
-import ppl.beacon.fake.chunk.storage.FakeStorageManager;
 import ppl.beacon.fake.chunk.VisibleChunksTracker;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.*;
@@ -74,7 +73,7 @@ public class WorldManager implements AutoCloseable {
         this.directory = directory;
         this.metaFile = metaFile(directory);
 
-        load(readFromDisk());
+        loadMetaFile();
 
         if (outdatedWorlds.isEmpty()) return;
 
@@ -126,7 +125,7 @@ public class WorldManager implements AutoCloseable {
                     if (unknownAgeResults == null) {
                         unknownAgeResults = new ArrayList<>();
                     }
-                    unknownAgeResults.add(world.storage.loadTag(chunkPos));
+                    unknownAgeResults.add(world.storage.loadChunk(chunkPos));
 
                     // We'll schedule the region to load regardless, so future queries may use it.
                     // (need to do that later though because it requires a write lock)
@@ -145,7 +144,7 @@ public class WorldManager implements AutoCloseable {
                         if (unknownAgeResults == null) {
                             unknownAgeResults = new ArrayList<>();
                         }
-                        unknownAgeResults.add(world.storage.loadTag(chunkPos));
+                        unknownAgeResults.add(world.storage.loadChunk(chunkPos));
                         continue;
                     }
 
@@ -176,7 +175,7 @@ public class WorldManager implements AutoCloseable {
         if (unknownAgeResults == null) {
             // Fast path, we already know exactly which world has the most recent chunk
             if (knownBestWorld != null) {
-                return knownBestWorld.storage.loadTag(chunkPos);
+                return knownBestWorld.storage.loadChunk(chunkPos);
             } else {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
@@ -209,7 +208,7 @@ public class WorldManager implements AutoCloseable {
                 }
 
                 if (fKnownBestWorld != null && fKnownBestAge > bestAge) {
-                    return fKnownBestWorld.storage.loadTag(chunkPos);
+                    return fKnownBestWorld.storage.loadChunk(chunkPos);
                 } else {
                     return CompletableFuture.completedFuture(Optional.ofNullable(bestResult));
                 }
@@ -292,9 +291,7 @@ public class WorldManager implements AutoCloseable {
     private boolean updateWithLock() {
         now = System.currentTimeMillis();
 
-        if (dirty && now - lastSave > 10_000) {
-            scheduleSave();
-        }
+        if (dirty && now - lastSave > 10_000) scheduleSave();
 
         // Jobs are being worked on in roughly the same order as we iterate over them, so once we've found a
         // few jobs that were still pending, there's not really much point in looking any further
@@ -304,9 +301,7 @@ public class WorldManager implements AutoCloseable {
         while (fingerprintJobsIter.hasNext()) {
             ComputeLegacyFingerprintJob job = fingerprintJobsIter.next();
             if (job.result == null) {
-                if (misses++ > WorldManagerCollection.CONCURRENT_FINGERPRINT_JOBS * 2) {
-                    break;
-                }
+                if (misses++ > WorldManagerCollection.CONCURRENT_FINGERPRINT_JOBS * 2) break;
                 continue;
             }
             fingerprintJobsIter.remove();
@@ -335,9 +330,7 @@ public class WorldManager implements AutoCloseable {
         while (loadingJobsIter.hasNext()) {
             RegionLoadingJob job = loadingJobsIter.next();
             if (job.result == null) {
-                if (misses++ > WorldManagerCollection.CONCURRENT_REGION_LOADING_JOBS * 2) {
-                    break;
-                }
+                if (misses++ > WorldManagerCollection.CONCURRENT_REGION_LOADING_JOBS * 2) break;
                 continue;
             }
             loadingJobsIter.remove();
@@ -382,22 +375,17 @@ public class WorldManager implements AutoCloseable {
         Iterator<Object2LongMap.Entry<World>> iter = pendingMergeChecks.object2LongEntrySet().iterator();
         while (iter.hasNext()) {
             Object2LongMap.Entry<World> entry = iter.next();
-            if (entry.getLongValue() + 1_000 > now) {
-                break;
-            }
+            if (entry.getLongValue() + 1_000 > now) break;
 
             World targetWorld = entry.getKey();
             World currentWorld = worlds.get(currentWorldId);
 
             iter.remove();
 
-            if (targetWorld == null) {
-                continue; // target not currently available (e.g. might need upgrade)
-            }
-
-            if (currentWorld.mergingIntoWorld != -1 || targetWorld.mergingIntoWorld != -1) {
-                continue; // already merging
-            }
+            // target not currently available (e.g. might need upgrade)
+            if (targetWorld == null) continue;
+            // already merging
+            if (currentWorld.mergingIntoWorld != -1 || targetWorld.mergingIntoWorld != -1) continue;
 
             Match match = targetWorld.getMatch(currentWorld);
 
@@ -734,9 +722,7 @@ public class WorldManager implements AutoCloseable {
         };
 
         for (World world : worlds.values()) {
-            if (!couldWorldMatch.test(world)) {
-                continue;
-            }
+            if (!couldWorldMatch.test(world)) continue;
 
             Region region = world.regions.get(regionCoord);
             if (region == null) {
@@ -750,9 +736,8 @@ public class WorldManager implements AutoCloseable {
                                 .toArray(CompletableFuture[]::new)
                 );
             } else {
-                if (!region.chunks.containsKey(chunkCoord)) {
-                    continue; // we don't know what's at this chunk in that world, can't match it
-                }
+                // we don't know what's at this chunk in that world, can't match it
+                if (!region.chunks.containsKey(chunkCoord)) continue;
 
                 long worldChunkHash = region.chunkFingerprints.get(chunkCoord);
                 if (worldChunkHash == 0) {
@@ -760,10 +745,8 @@ public class WorldManager implements AutoCloseable {
                     return computeLegacyFingerprint(world, chunkPos, mcWorld);
                 }
 
-                if (fingerprint == 1 && worldChunkHash == 1) {
-                    // neither chunk has enough entropy to draw any conclusions, see [ChunkSerializer.fingerprint]
-                    continue;
-                }
+                // neither chunk has enough entropy to draw any conclusions, see [ChunkSerializer.fingerprint]
+                if (fingerprint == 1 && worldChunkHash == 1) continue;
 
                 Match match = world.getMatch(currentWorld);
 
@@ -868,17 +851,6 @@ public class WorldManager implements AutoCloseable {
         }
     }
 
-    private NbtCompound readFromDisk() {
-        if (Files.exists(metaFile)) {
-            try (InputStream in = Files.newInputStream(metaFile)) {
-                return NbtIo.readCompressed(in, NbtSizeTracker.ofUnlimitedBytes());
-            } catch (IOException e) {
-                WorldManagerCollection.LOGGER.error("Failed to read " + metaFile, e);
-            }
-        }
-        return null;
-    }
-
     private void writeToDisk(NbtCompound nbt) throws IOException {
         Files.createDirectories(directory);
 
@@ -924,48 +896,60 @@ public class WorldManager implements AutoCloseable {
         return root;
     }
 
-    private void load(NbtCompound root) {
-        if (root == null && !Files.exists(directory)) {
-            nextWorldId = 1;
-        } else if (root == null) {
-            outdatedWorlds.add(new World(0, 0, this));
-
-            try (Stream<Path> stream = Files.list(directory)) {
-                stream.filter(Files::isDirectory).flatMapToInt(dir -> {
-                    String name = dir.getFileName().toString();
-                    try {
-                        return IntStream.of(Integer.parseInt(name));
-                    } catch (NumberFormatException e) {
-                        return IntStream.of();
-                    }
-                }).forEach(id -> outdatedWorlds.add(new World(id, 0, this)));
+    private void loadMetaFile() {
+        NbtCompound root = null;
+        if (Files.exists(metaFile)) {
+            try (InputStream in = Files.newInputStream(metaFile)) {
+                root = NbtIo.readCompressed(in, NbtSizeTracker.ofUnlimitedBytes());
             } catch (IOException e) {
-                WorldManagerCollection.LOGGER.error("Failed to list files in " + directory, e);
+                WorldManagerCollection.LOGGER.error("Failed to read " + metaFile, e);
             }
+        }
 
-            for (World world : outdatedWorlds) {
-                Path worldDirectory = world.directory();
-                try {
-                    for (RegionPos region : FakeStorage.getRegions(worldDirectory)) {
-                        world.knownRegions.add(region.toLong());
-                    }
+        if (root == null) {
+            if (Files.exists(directory)) {
+                outdatedWorlds.add(new World(0, 0, this));
+
+                try (Stream<Path> stream = Files.list(directory)) {
+                    stream.filter(Files::isDirectory).flatMapToInt(dir -> {
+                        String name = dir.getFileName().toString();
+                        try {
+                            return IntStream.of(Integer.parseInt(name));
+                        } catch (NumberFormatException e) {
+                            return IntStream.of();
+                        }
+                    }).forEach(id -> outdatedWorlds.add(new World(id, 0, this)));
                 } catch (IOException e) {
-                    WorldManagerCollection.LOGGER.error("Failed to list files in " + worldDirectory, e);
+                    WorldManagerCollection.LOGGER.error("Failed to list files in " + directory, e);
                 }
-            }
 
-            nextWorldId = outdatedWorlds.stream().mapToInt(it -> it.id).max().orElse(0) + 1;
+                for (World world : outdatedWorlds) {
+                    Path worldDirectory = world.directory();
+                    try {
+                        FakeStorage.getRegions(worldDirectory)
+                                .forEach(region -> world.knownRegions.add(region.toLong()));
+                    } catch (IOException e) {
+                        WorldManagerCollection.LOGGER.error("Failed to list files in " + worldDirectory, e);
+                    }
+                }
+
+                nextWorldId = outdatedWorlds.stream().mapToInt(it -> it.id).max().orElse(0) + 1;
+            } else {
+                nextWorldId = 1;
+            }
         } else {
             for (NbtElement worldNbtElement : root.getList("worlds", NbtElement.COMPOUND_TYPE)) {
                 NbtCompound worldNbt = (NbtCompound) worldNbtElement;
+
                 World world = new World(worldNbt.getInt("id"), worldNbt.getInt("version"), this);
                 world.knownRegions.addAll(LongArrayList.wrap(worldNbt.getLongArray("regions")));
-                if (worldNbt.contains("merging_into")) {
-                    world.mergingIntoWorld = worldNbt.getInt("merging_into");
-                }
+                if (worldNbt.contains("merging_into")) world.mergingIntoWorld = worldNbt.getInt("merging_into");
+
+                // Restore matches
                 for (NbtElement matchNbtElement : worldNbt.getList("matches", NbtElement.COMPOUND_TYPE)) {
                     NbtCompound matchNbt = (NbtCompound) matchNbtElement;
                     int otherWorldId = matchNbt.getInt("world");
+
                     Match match = new Match(
                             new LongOpenHashSet(worldNbt.getLongArray("matching")),
                             new LongOpenHashSet(worldNbt.getLongArray("mismatching"))

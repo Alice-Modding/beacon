@@ -50,12 +50,15 @@ public class FakeChunkManager {
     private static final String FALLBACK_LEVEL_NAME = "beacon-fallback";
     private static final MinecraftClient client = MinecraftClient.getInstance();
 
-    private final ClientWorld world;
-    private final ClientChunkManager clientChunkManager;
-    private final ClientChunkManagerExt clientChunkManagerExt;
     private final WorldManager worlds;
-    private final FakeStorage storage;
+    private final ClientWorld world;
+
+    private final ClientChunkManagerExt clientChunkManagerExt;
+    private final ClientChunkManager clientChunkManager;
+
     private final List<Function<ChunkPos, CompletableFuture<Optional<NbtCompound>>>> storages = new ArrayList<>();
+    private final FakeStorage storage;
+
     private int ticksSinceLastSave;
 
     private final Long2ObjectMap<WorldChunk> fakeChunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
@@ -115,7 +118,7 @@ public class FakeChunkManager {
             storage = null;
         } else {
             storage = FakeStorageManager.getFor(storagePath, true);
-            storages.add(storage::loadTag);
+            storages.add(storage::loadChunk);
 
             worlds = null;
         }
@@ -126,7 +129,7 @@ public class FakeChunkManager {
                 Path worldDirectory = session.getWorldDirectory(worldKey);
                 Path regionDirectory = worldDirectory.resolve("region");
                 FakeStorage fallbackStorage = FakeStorageManager.getFor(regionDirectory, false);
-                storages.add(fallbackStorage::loadTag);
+                storages.add(fallbackStorage::loadChunk);
             } catch (Exception e) {}
         }
     }
@@ -308,8 +311,7 @@ public class FakeChunkManager {
         }
 
         if (worlds != null) {
-            boolean didMerge = worlds.update();
-            if (didMerge) {
+            if (worlds.update()) {
                 loadMissingChunksFromCache();
             }
         }
@@ -393,17 +395,15 @@ public class FakeChunkManager {
         }
     }
 
-    public Supplier<WorldChunk> save(WorldChunk chunk) {
-        FakeChunk fakeChunk = new FakeChunk(chunk);
-        fingerprint(fakeChunk);
-        LightingProvider lightingProvider = chunk.getWorld().getLightingProvider();
+    public Supplier<WorldChunk> saveChunk(FakeChunk chunk) {
+        fingerprint(chunk);
         FakeStorage storage = worlds != null ? worlds.getCurrentStorage() : this.storage;
         saveExecutor.execute(() -> {
-            NbtCompound nbt = FakeChunkSerializer.serialize(fakeChunk, lightingProvider);
+            NbtCompound nbt = FakeChunkSerializer.serialize(chunk, chunk.getWorld().getLightingProvider());
             nbt.putLong("age", System.currentTimeMillis()); // fallback in case meta gets corrupted
-            storage.save(chunk.getPos(), nbt);
+            storage.saveChunk(chunk.getPos(), nbt);
         });
-        return FakeChunkSerializer.loadChunk(fakeChunk, fakeChunk.blockLight, fakeChunk.skyLight);
+        return FakeChunkSerializer.loadChunk(chunk, chunk.blockLight, chunk.skyLight);
     }
 
     public void fingerprint(WorldChunk chunk) {

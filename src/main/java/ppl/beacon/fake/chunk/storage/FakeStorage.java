@@ -1,6 +1,5 @@
 package ppl.beacon.fake.chunk.storage;
 
-import com.mojang.datafixers.DataFixer;
 import com.mojang.serialization.MapCodec;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import net.minecraft.SharedConstants;
@@ -28,7 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static ppl.beacon.fake.chunk.storage.FakeStorageManager.REGION_FILE_PATTERN;
@@ -82,43 +80,40 @@ public class FakeStorage extends VersionedChunkStorage {
 //        lastAccess.close();
     }
 
-    public void save(ChunkPos pos, NbtCompound chunk) {
+    public void saveChunk(ChunkPos pos, NbtCompound chunk) {
 //        if (lastAccess != null) {
 //            lastAccess.touchRegion(pos.getRegionX(), pos.getRegionZ());
 //        }
         setNbt(pos, chunk);
     }
 
-    public CompletableFuture<Optional<NbtCompound>> loadTag(ChunkPos pos) {
-        return getNbt(pos).thenApply(maybeNbt -> maybeNbt.map(nbt -> loadTag(pos, nbt)));
-    }
-
-    private NbtCompound loadTag(ChunkPos pos, NbtCompound nbt) {
-//        if (nbt != null && lastAccess != null) {
+    public CompletableFuture<Optional<NbtCompound>> loadChunk(ChunkPos pos) {
+//        if (lastAccess != null) {
 //            lastAccess.touchRegion(pos.getRegionX(), pos.getRegionZ());
 //        }
+        return getNbt(pos).thenApply(maybeNbt -> maybeNbt.map(this::loadTag));
+    }
+
+    private NbtCompound loadTag(NbtCompound nbt) {
         if (nbt != null && nbt.getInt("DataVersion") != SharedConstants.getGameVersion().getSaveVersion().getId()) {
             if (sentUpgradeNotification.compareAndSet(false, true)) {
                 MinecraftClient client = MinecraftClient.getInstance();
-                client.submit(() -> {
-                    Text text = Text.translatable(writeable ? "beacon.upgrade.required" : "beacon.upgrade.fallback_world");
-                    client.submit(() -> client.inGameHud.getChatHud().addMessage(text));
-                });
+                Text text = Text.translatable(writeable ? "beacon.upgrade.required" : "beacon.upgrade.fallback_world");
+                client.submit(() -> client.inGameHud.getChatHud().addMessage(text));
             }
             return null;
         }
         return nbt;
     }
 
-    public static List<RegionPos> getRegions(Path directory) throws IOException {
+    public static Stream<RegionPos> getRegions(Path directory) throws IOException {
         try (Stream<Path> stream = Files.list(directory)) {
             return stream
                     .map(Path::getFileName)
                     .map(Path::toString)
                     .map(REGION_FILE_PATTERN::matcher)
                     .filter(Matcher::matches)
-                    .map(it -> new RegionPos(Integer.parseInt(it.group(1)), Integer.parseInt(it.group(2))))
-                    .collect(Collectors.toList());
+                    .map(it -> new RegionPos(Integer.parseInt(it.group(1)), Integer.parseInt(it.group(2))));
         }
     }
 
@@ -126,7 +121,7 @@ public class FakeStorage extends VersionedChunkStorage {
         Optional<RegistryKey<MapCodec<? extends ChunkGenerator>>> generatorKey =
                 Optional.of(Registries.CHUNK_GENERATOR.getKey(FlatChunkGenerator.CODEC).orElseThrow());
 
-        List<ChunkPos> chunks = getRegions(directory).stream().flatMap(RegionPos::getContainedChunks).toList();
+        List<ChunkPos> chunks = getRegions(directory).flatMap(RegionPos::getContainedChunks).toList();
 
         AtomicInteger done = new AtomicInteger();
         AtomicInteger total = new AtomicInteger(chunks.size());

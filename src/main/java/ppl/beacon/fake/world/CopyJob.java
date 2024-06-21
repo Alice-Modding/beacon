@@ -29,7 +29,7 @@ public class CopyJob implements Runnable {
 
     @Override
     public void run() {
-        NbtCompound nbt = source.storage.loadTag(chunkPos).join().orElse(null);
+        NbtCompound nbt = source.storage.loadChunk(chunkPos).join().orElse(null);
         if (nbt == null) {
             done = true;
             return;
@@ -48,7 +48,7 @@ public class CopyJob implements Runnable {
 
         // Save doesn't return a future, so we instead wait for all writes to be done (syncing to disk only once
         // after every job for the region is done)
-        target.storage.save(chunkPos, nbt);
+        target.storage.saveChunk(chunkPos, nbt);
         ((StorageIoWorker) target.storage.getWorker()).completeAll(false).join();
         done = true;
     }

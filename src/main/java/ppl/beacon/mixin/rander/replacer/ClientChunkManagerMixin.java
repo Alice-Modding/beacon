@@ -102,7 +102,7 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
         WorldChunk chunk = getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null || chunk instanceof FakeChunk) return;
 
-        Supplier<WorldChunk> copy = fakeChunkManager.save(chunk);
+        Supplier<WorldChunk> copy = fakeChunkManager.saveChunk(new FakeChunk(chunk));
 
         if (fakeChunkManager.shouldBeLoaded(chunkX, chunkZ)) {
             chunkReplacements.add(Pair.of(chunkPos, copy));

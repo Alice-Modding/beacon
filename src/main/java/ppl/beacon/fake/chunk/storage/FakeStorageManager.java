@@ -38,9 +38,9 @@ import java.util.stream.Stream;
 
 public class FakeStorageManager {
     protected static final Logger LOGGER = LogManager.getLogger();
-    private static final Map<Path, FakeStorage> active = new HashMap<>();
-
     public static final Pattern REGION_FILE_PATTERN = Pattern.compile("^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$");
+
+    private static final Map<Path, FakeStorage> active = new HashMap<>();
 
     public static FakeStorage getFor(Path directory, boolean writeable) {
         synchronized (active) {

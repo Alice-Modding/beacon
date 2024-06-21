@@ -25,7 +25,7 @@ public class ComputeLegacyFingerprintJob implements Runnable {
 
     @Override
     public void run() {
-        NbtCompound nbt = world.storage.loadTag(chunkPos).join().orElse(null);
+        NbtCompound nbt = world.storage.loadChunk(chunkPos).join().orElse(null);
         if (nbt == null) {
             result = 0L;
             return;
