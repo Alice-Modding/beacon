@@ -190,13 +190,13 @@ public class FakeChunkManager {
             int distanceX = Math.abs(x - newCenterX);
             int distanceZ = Math.abs(z - newCenterZ);
             int distanceSquared = distanceX * distanceX + distanceZ * distanceZ;
-            newJobs.add(new LoadingJob(x, z, distanceSquared));
+            newJobs.add(new LoadingJob(new ChunkPos(x, z), distanceSquared));
         });
 
         if (!newJobs.isEmpty()) {
             newJobs.sort(LoadingJob.BY_DISTANCE);
             newJobs.forEach(job -> {
-                loadingJobs.put(ChunkPos.toLong(job.x, job.z), job);
+                loadingJobs.put(job.pos.toLong(), job);
                 loadExecutor.execute(job);
             });
         }
@@ -262,7 +262,7 @@ public class FakeChunkManager {
             LoadingJob loadingJob = loadingJobsIter.next();
 
             // Still loading, should we wait for it?
-            if (loadingJob.result.isEmpty()) continue;
+            if (loadingJob.result == null) continue;
 
             // Done loading
             loadingJobsIter.remove();
@@ -293,10 +293,6 @@ public class FakeChunkManager {
         return chunkTracker.isInViewDistance(x, z);
     }
 
-    private CompletableFuture<Optional<NbtCompound>> loadTag(int x, int z) {
-        return loadTag(new ChunkPos(x, z), 0);
-    }
-
     private CompletableFuture<Optional<NbtCompound>> loadTag(ChunkPos chunkPos, int storageIndex) {
         return storages.get(storageIndex).apply(chunkPos).thenCompose(maybeTag -> {
             if (maybeTag.isPresent()) {
@@ -309,16 +305,16 @@ public class FakeChunkManager {
         });
     }
 
-    public void load(int x, int z, WorldChunk chunk) {
-        fakeChunks.put(ChunkPos.toLong(x, z), chunk);
+    public void load(ChunkPos pos, WorldChunk chunk) {
+        fakeChunks.put(pos.toLong(), chunk);
 
-        world.resetChunkColor(new ChunkPos(x, z));
+        world.resetChunkColor(pos);
 
         for (int i = world.getBottomSectionCoord(), l = world.getTopSectionCoord(); i < l; i++) {
-            world.scheduleBlockRenders(x, i, z);
+            world.scheduleBlockRenders(pos.x, i, pos.z);
         }
 
-        clientChunkManagerExt.beacon$onFakeChunkAdded(x, z);
+        clientChunkManagerExt.beacon$onFakeChunkAdded(pos.x, pos.z);
     }
 
     public boolean unload(int x, int z, boolean willBeReplaced) {
@@ -372,16 +368,11 @@ public class FakeChunkManager {
     public void fingerprint(WorldChunk chunk) {
         if (worlds == null) return;
 
-        long chunkCoord = chunk.getPos().toLong();
+        FingerprintJob newJob = new FingerprintJob(chunk);
+        FingerprintJob oldJob = fingerprintJobs.put(chunk.getPos().toLong(), newJob);
+        if (oldJob != null) oldJob.cancelled = true;
 
-        FingerprintJob job = fingerprintJobs.get(chunkCoord);
-        if (job != null) {
-            job.cancelled = true;
-        }
-
-        job = new FingerprintJob(chunk);
-        fingerprintJobs.put(chunkCoord, job);
-        Util.getMainWorkerExecutor().execute(job);
+        Util.getMainWorkerExecutor().execute(newJob);
     }
 
     private static String getCurrentWorldOrServerName(ClientPlayNetworkHandler networkHandler) {
@@ -410,16 +401,16 @@ public class FakeChunkManager {
     }
 
     private class LoadingJob implements Runnable {
-        private final int x;
-        private final int z;
+        public static final Comparator<LoadingJob> BY_DISTANCE = Comparator.comparing(it -> it.distanceSquared);
+
+        private final ChunkPos pos;
         private final int distanceSquared;
         private volatile boolean cancelled;
         @SuppressWarnings("OptionalUsedAsFieldOrParameterType") // null while loading, empty() if no chunk was found
         private volatile Optional<Supplier<WorldChunk>> result;
 
-        public LoadingJob(int x, int z, int distanceSquared) {
-            this.x = x;
-            this.z = z;
+        public LoadingJob(ChunkPos pos, int distanceSquared) {
+            this.pos = pos;
             this.distanceSquared = distanceSquared;
         }
 
@@ -428,20 +419,19 @@ public class FakeChunkManager {
             if (cancelled) return;
             Optional<NbtCompound> value;
             try {
-                value = loadTag(x, z).get();
+                value = loadTag(pos, 0).get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 value = Optional.empty();
             }
             if (cancelled) return;
-            result = value.map(it -> FakeChunkSerializer.deserialize(FakeChunkSerializer.deserialize(new ChunkPos(x, z), it, world), it, world));
+            result = value.map(it -> FakeChunkSerializer.deserialize(FakeChunkSerializer.deserialize(pos, it, world), it, world));
         }
 
         public void complete() {
-            result.ifPresent(it -> load(x, z, it.get()));
+            result.ifPresent(it -> load(pos, it.get()));
         }
 
-        public static final Comparator<LoadingJob> BY_DISTANCE = Comparator.comparing(it -> it.distanceSquared);
     }
 
     private static class FingerprintJob implements Runnable {
