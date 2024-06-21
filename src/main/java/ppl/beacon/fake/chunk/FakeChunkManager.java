@@ -314,7 +314,7 @@ public class FakeChunkManager {
 
         world.resetChunkColor(new ChunkPos(x, z));
 
-        for (int i = world.getBottomSectionCoord(); i < world.getTopSectionCoord(); i++) {
+        for (int i = world.getBottomSectionCoord(), l = world.getTopSectionCoord(); i < l; i++) {
             world.scheduleBlockRenders(x, i, z);
         }
 
@@ -335,7 +335,7 @@ public class FakeChunkManager {
 
             lightingProviderExt.beacon$disableColumn(chunkPos);
 
-            for (int i = 0; i < chunk.getSectionArray().length; i++) {
+            for (int i = 0, l = chunk.getSectionArray().length; i < l; i++) {
                 int y = world.sectionIndexToCoord(i);
                 if (blockLightProvider != null) {
                     blockLightProvider.beacon$removeSectionData(ChunkSectionPos.asLong(x, y, z));

@@ -108,7 +108,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
         DynamicRegistryManager registryManager = chunk.getWorld().getRegistryManager();
         Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec = getBiomCodec(registryManager);
 
-        for (int y = lightingProvider.getBottomY(); y < lightingProvider.getTopY(); ++y) {
+        for (int y = lightingProvider.getBottomY(), my = lightingProvider.getTopY(); y < my; ++y) {
             NbtCompound sectionNbt = new NbtCompound();
             int i = chunk.sectionCoordToIndex(y);
 
@@ -182,7 +182,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
         DynamicRegistryManager registryManager = world.getRegistryManager();
         Registry<Biome> biomeRegistry = registryManager.get(RegistryKeys.BIOME);
         Codec<PalettedContainer<RegistryEntry<Biome>>> biomeCodec = getPalettedBiomCodec(biomeRegistry);
-        for (int i = 0; i < section.size(); i++) {
+        for (int i = 0, s = section.size(); i < s; i++) {
             NbtCompound sectionNbt = section.getCompound(i);
             int y = sectionNbt.getByte("Y");
             int l = world.sectionCoordToIndex(y);
@@ -231,7 +231,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
 
         if (!BeaconMod.getConfig().getRanderConfig().isNoBlockEntities()) {
             NbtList blockEntitiesTag = nbtCompound.getList("block_entities", NbtElement.COMPOUND_TYPE);
-            for (int i = 0; i < blockEntitiesTag.size(); i++) {
+            for (int i = 0, l = blockEntitiesTag.size(); i < l; i++) {
                 chunk.addPendingBlockEntityNbt(blockEntitiesTag.getCompound(i));
             }
         }
@@ -245,7 +245,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
         ChunkNibbleArray[] skyLight = new ChunkNibbleArray[chunkSections.length + 2];
 
         Arrays.fill(blockLight, COMPLETELY_DARK);
-        for (int i = 0; i < section.size(); i++) {
+        for (int i = 0, s = section.size(); i < s; i++) {
             NbtCompound sectionNbt = section.getCompound(i);
             int y = sectionNbt.getByte("Y");
             int l = world.sectionCoordToIndex(y);
@@ -309,7 +309,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
             ChunkLightProviderExt blockLightProvider = ChunkLightProviderExt.get(lightingProvider.get(LightType.BLOCK));
             ChunkLightProviderExt skyLightProvider = ChunkLightProviderExt.get(lightingProvider.get(LightType.SKY));
 
-            for (int i = -1; i < chunkSections.length + 1; i++) {
+            for (int i = -1, l = chunkSections.length + 1; i < l; i++) {
                 int y = world.sectionIndexToCoord(i);
                 if (blockLightProvider != null)
                     blockLightProvider.beacon$addSectionData(ChunkSectionPos.from(pos, y).asLong(), blockLight[i + 1]);

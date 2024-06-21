@@ -36,7 +36,6 @@ public class FakeChunk extends WorldChunk {
 
     public FakeChunk(WorldChunk real) {
         super(real.getWorld(), real.getPos(), UpgradeData.NO_UPGRADE_DATA, new ChunkTickScheduler<>(), new ChunkTickScheduler<>(), 0L, real.getSectionArray(), null, null);
-
         blockLight = new ChunkNibbleArray[getSectionArray().length + 2];
         skyLight = new ChunkNibbleArray[getSectionArray().length + 2];
 
@@ -45,9 +44,10 @@ public class FakeChunk extends WorldChunk {
         ChunkLightingView skyLightView = lightingProvider.get(LightType.SKY);
 
 
-        for (int y = lightingProvider.getBottomY(), i = 0; y < lightingProvider.getTopY(); y++, i++) {
-            blockLight[i] = blockLightView.getLightSection(ChunkSectionPos.from(pos, y));
-            skyLight[i] = skyLightView.getLightSection(ChunkSectionPos.from(pos, y));
+        for (int y = lightingProvider.getBottomY(), my = lightingProvider.getTopY(), i = 0; y < my; y++, i++) {
+            ChunkSectionPos chunkSectionPos = ChunkSectionPos.from(pos, y);
+            blockLight[i] = blockLightView.getLightSection(chunkSectionPos);
+            skyLight[i] = skyLightView.getLightSection(chunkSectionPos);
         }
 
         for (Map.Entry<Heightmap.Type, Heightmap> entry : real.getHeightmaps()) {
@@ -78,19 +78,18 @@ public class FakeChunk extends WorldChunk {
         ChunkLightProviderExt skyLightProvider = ChunkLightProviderExt.get(lightingProvider.get(LightType.SKY));
 
         int blockDelta = tinted ? 5 : 0;
-        double gamma = client.options.getGamma().getValue();
-        int skyDelta = tinted ? -3 + (int) (-7 * gamma) : 0;
+        int skyDelta = tinted ? -3 + (int) (-7 * client.options.getGamma().getValue()) : 0;
 
         if (blockLightProvider == null)
-            for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
+            for (int y = getBottomSectionCoord(), my = getTopSectionCoord(); y < my; y++)
                 blockLightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), blockDelta);
 
         if (skyLightProvider == null)
-            for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
+            for (int y = getBottomSectionCoord(), my = getTopSectionCoord(); y < my; y++)
                 skyLightProvider.beacon$setTinted(ChunkSectionPos.asLong(this.pos.x, y, this.pos.z), skyDelta);
 
 
-        for (int y = getBottomSectionCoord(); y < getTopSectionCoord(); y++)
+        for (int y = getBottomSectionCoord(), my = getTopSectionCoord(); y < my; y++)
             worldRenderer.scheduleBlockRender(this.pos.x, y, this.pos.z);
     }
 }

@@ -9,7 +9,7 @@ public record RegionPos(int x, int z) {
         int baseX = x << 5;
         int baseZ = z << 5;
         ChunkPos[] result = new ChunkPos[32 * 32];
-        for (int xz = 0; xz < 32 * 32; xz++) {
+        for (int xz = 0, mxz = 32 * 32; xz < mxz; xz++) {
             result[xz] = new ChunkPos(baseX + xz / 32, baseZ + xz % 32);
         }
         return Stream.of(result);

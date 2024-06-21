@@ -42,7 +42,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
 
         source.sendFeedback(Text.translatable("beacon.upgrade.begin"));
         new Thread(() -> {
-            for (int i = 0; i < storages.size(); i++) {
+            for (int i = 0, l = storages.size(); i < l; i++) {
                 FakeStorage storage = storages.get(i);
                 try {
                     storage.upgrade(world.getRegistryKey(), new ProgressReported(client, i, storages.size()));

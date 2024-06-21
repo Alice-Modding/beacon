@@ -16,9 +16,9 @@ public class VisibleChunksTracker {
     }
 
     private static void updateLongConsumer(LongConsumer consumer, int x1, int z1, int dist1, int x2, int z2, int dist2) {
-        for (int x = x1 - dist1; x <= x1 + dist1; x++) {
+        for (int x = x1 - dist1, mx = x1 + dist1; x <= mx; x++) {
             boolean xOutsideNew = x < x2 - dist2 || x > x2 + dist2;
-            for (int z = z1 - dist1; z <= z1 + dist1; z++) {
+            for (int z = z1 - dist1, mz = z1 + dist1; z <= mz; z++) {
                 boolean zOutsideNew = z < z2 - dist2 || z > z2 + dist2;
                 if (xOutsideNew || zOutsideNew) consumer.accept(ChunkPos.toLong(x, z));
             }
@@ -51,8 +51,8 @@ public class VisibleChunksTracker {
     }
 
     public void forEach(LongConsumer consumer) {
-        for (int x = centerX - viewDistance; x <= centerX + viewDistance; x++) {
-            for (int z = centerZ - viewDistance; z <= centerZ + viewDistance; z++) {
+        for (int x = centerX - viewDistance, mx = centerX + viewDistance; x <= mx; x++) {
+            for (int z = centerZ - viewDistance, mz = centerZ + viewDistance; z <= mz; z++) {
                 consumer.accept(ChunkPos.toLong(x, z));
             }
         }
