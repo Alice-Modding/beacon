@@ -24,8 +24,9 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import net.minecraft.world.level.storage.LevelStorage;
 import org.apache.commons.lang3.tuple.Pair;
 import ppl.beacon.BeaconMod;
-import ppl.beacon.config.Config;
 import ppl.beacon.config.RanderConfig;
+import ppl.beacon.fake.chunk.storage.FakeStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorageManager;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 import ppl.beacon.fake.ext.LightingProviderExt;
@@ -35,8 +36,6 @@ import ppl.beacon.mixin.world.BiomeAccessAccessor;
 import ppl.beacon.mixin.world.ClientWorldAccessor;
 import ppl.beacon.utils.filesystem.FileSystemUtils;
 
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -55,7 +54,7 @@ public class FakeChunkManager {
     private final ClientChunkManager clientChunkManager;
     private final ClientChunkManagerExt clientChunkManagerExt;
     private final WorldManager worlds;
-    private final FakeChunkStorage storage;
+    private final FakeStorage storage;
     private final List<Function<ChunkPos, CompletableFuture<Optional<NbtCompound>>>> storages = new ArrayList<>();
     private int ticksSinceLastSave;
 
@@ -80,6 +79,17 @@ public class FakeChunkManager {
 
     private final Long2ObjectMap<FingerprintJob> fingerprintJobs = new Long2ObjectLinkedOpenHashMap<>();
 
+    private Path getStoragePath(String serverName) {
+        Path storagePath = client.runDirectory.toPath().resolve(".beacon");
+
+        if (FileSystemUtils.oldFolderExists(storagePath, serverName)) {
+            storagePath = storagePath.resolve(serverName);
+        } else {
+            storagePath = FileSystemUtils.resolveSafeDirectoryName(storagePath, serverName);
+        }
+        return storagePath;
+    }
+
     public FakeChunkManager(ClientWorld world, ClientChunkManager clientChunkManager) {
         this.world = world;
         this.clientChunkManager = clientChunkManager;
@@ -91,15 +101,8 @@ public class FakeChunkManager {
         long seedHash = ((BiomeAccessAccessor) world.getBiomeAccess()).getSeed();
         RegistryKey<World> worldKey = world.getRegistryKey();
         Identifier worldId = worldKey.getValue();
-        Path storagePath = client.runDirectory
-                .toPath()
-                .resolve(".beacon");
-        if (oldFolderExists(storagePath, serverName)) {
-            storagePath = storagePath.resolve(serverName);
-        } else {
-            storagePath = FileSystemUtils.resolveSafeDirectoryName(storagePath, serverName);
-        }
-        storagePath = storagePath
+
+        Path storagePath = getStoragePath(serverName)
                 .resolve(seedHash + "")
                 .resolve(worldId.getNamespace())
                 .resolve(worldId.getPath());
@@ -111,7 +114,7 @@ public class FakeChunkManager {
 
             storage = null;
         } else {
-            storage = FakeChunkStorage.getFor(storagePath, true);
+            storage = FakeStorageManager.getFor(storagePath, true);
             storages.add(storage::loadTag);
 
             worlds = null;
@@ -122,19 +125,9 @@ public class FakeChunkManager {
             try (LevelStorage.Session session = levelStorage.createSession(FALLBACK_LEVEL_NAME)) {
                 Path worldDirectory = session.getWorldDirectory(worldKey);
                 Path regionDirectory = worldDirectory.resolve("region");
-                FakeChunkStorage fallbackStorage = FakeChunkStorage.getFor(regionDirectory, false);
+                FakeStorage fallbackStorage = FakeStorageManager.getFor(regionDirectory, false);
                 storages.add(fallbackStorage::loadTag);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private static boolean oldFolderExists(Path bobbyFolder, String name) {
-        try {
-            return Files.exists(bobbyFolder.resolve(name));
-        } catch (InvalidPathException e) {
-            return false;
+            } catch (Exception e) {}
         }
     }
 
@@ -142,7 +135,7 @@ public class FakeChunkManager {
         return fakeChunks.get(ChunkPos.toLong(x, z));
     }
 
-    public FakeChunkStorage getStorage() {
+    public FakeStorage getStorage() {
         return storage;
     }
 
@@ -404,7 +397,7 @@ public class FakeChunkManager {
         FakeChunk fakeChunk = new FakeChunk(chunk);
         fingerprint(fakeChunk);
         LightingProvider lightingProvider = chunk.getWorld().getLightingProvider();
-        FakeChunkStorage storage = worlds != null ? worlds.getCurrentStorage() : this.storage;
+        FakeStorage storage = worlds != null ? worlds.getCurrentStorage() : this.storage;
         saveExecutor.execute(() -> {
             NbtCompound nbt = FakeChunkSerializer.serialize(fakeChunk, lightingProvider);
             nbt.putLong("age", System.currentTimeMillis()); // fallback in case meta gets corrupted

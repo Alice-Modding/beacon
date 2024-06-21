@@ -5,7 +5,8 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.util.math.ChunkPos;
-import ppl.beacon.fake.chunk.FakeChunkStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorageManager;
 import ppl.beacon.fake.chunk.VisibleChunksTracker;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.*;
@@ -220,17 +221,17 @@ public class WorldManager implements AutoCloseable {
         return directory.resolve("worlds.meta");
     }
 
-    public FakeChunkStorage getCurrentStorage() {
+    public FakeStorage getCurrentStorage() {
         assert MinecraftClient.getInstance().isOnThread();
         return worlds.get(currentWorldId).storage;
     }
 
-    public List<FakeChunkStorage> getOutdatedWorlds() {
+    public List<FakeStorage> getOutdatedWorlds() {
         assert MinecraftClient.getInstance().isOnThread();
         return outdatedWorlds.stream().map(it -> it.storage).collect(Collectors.toList());
     }
 
-    public void markAsUpToDate(FakeChunkStorage storage) {
+    public void markAsUpToDate(FakeStorage storage) {
         World world = outdatedWorlds.stream().filter(it -> it.storage == storage).findFirst().orElse(null);
         assert world != null;
 
@@ -945,7 +946,7 @@ public class WorldManager implements AutoCloseable {
             for (World world : outdatedWorlds) {
                 Path worldDirectory = world.directory();
                 try {
-                    for (RegionPos region : FakeChunkStorage.getRegions(worldDirectory)) {
+                    for (RegionPos region : FakeStorage.getRegions(worldDirectory)) {
                         world.knownRegions.add(region.toLong());
                     }
                 } catch (IOException e) {

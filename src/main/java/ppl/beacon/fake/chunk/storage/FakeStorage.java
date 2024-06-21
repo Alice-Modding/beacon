@@ -1,8 +1,7 @@
-package ppl.beacon.fake.chunk;
+package ppl.beacon.fake.chunk.storage;
 
+import com.mojang.datafixers.DataFixer;
 import com.mojang.serialization.MapCodec;
-import ppl.beacon.config.Config;
-import ppl.beacon.utils.RegionPos;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.MinecraftClient;
@@ -17,59 +16,32 @@ import net.minecraft.world.gen.chunk.FlatChunkGenerator;
 import net.minecraft.world.storage.StorageIoWorker;
 import net.minecraft.world.storage.StorageKey;
 import net.minecraft.world.storage.VersionedChunkStorage;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.Nullable;
-//import ppl.beacon.utils.filesystem.LastAccessFile;
+import ppl.beacon.utils.RegionPos;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class FakeChunkStorage extends VersionedChunkStorage {
-    private static final Logger LOGGER = LogManager.getLogger();
-    private static final Map<Path, FakeChunkStorage> active = new HashMap<>();
+import static ppl.beacon.fake.chunk.storage.FakeStorageManager.REGION_FILE_PATTERN;
 
-    public static final Pattern REGION_FILE_PATTERN = Pattern.compile("^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$");
-
-    public static FakeChunkStorage getFor(Path directory, boolean writeable) {
-        synchronized (active) {
-            return active.computeIfAbsent(directory, f -> new FakeChunkStorage(directory, writeable));
-        }
-    }
-
-    public static void closeAll() {
-        synchronized (active) {
-            for (FakeChunkStorage storage : active.values()) {
-                try {
-                    storage.close();
-                } catch (IOException e) {
-                    LOGGER.error("Failed to close storage", e);
-                }
-            }
-            active.clear();
-        }
-    }
-
-    private final Path directory;
-    private final boolean writeable;
+public class FakeStorage extends VersionedChunkStorage {
     private final AtomicBoolean sentUpgradeNotification = new AtomicBoolean();
+    private final boolean writeable;
+    private final Path directory;
+
 //    @Nullable
 //    private final LastAccessFile lastAccess;
 
-    private FakeChunkStorage(Path directory, boolean writeable) {
+    protected FakeStorage(Path directory, boolean writeable) {
         super(
                 new StorageKey("dummy", World.OVERWORLD, "beacon"),
                 directory,
@@ -87,7 +59,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
 
 //                lastAccess = new LastAccessFile(directory);
             } catch (IOException e) {
-                LOGGER.error("Failed to read last_access file:", e);
+                FakeStorageManager.LOGGER.error("Failed to read last_access file:", e);
             }
         }
 //        this.lastAccess = lastAccess;
@@ -173,7 +145,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
                     try {
                         nbt = io.readChunkData(chunkPos).join().orElse(null);
                     } catch (CompletionException e) {
-                        LOGGER.warn("Error reading chunk " + chunkPos.x + "/" + chunkPos.z + ":", e);
+                        FakeStorageManager.LOGGER.warn("Error reading chunk " + chunkPos.x + "/" + chunkPos.z + ":", e);
                         nbt = null;
                     }
 

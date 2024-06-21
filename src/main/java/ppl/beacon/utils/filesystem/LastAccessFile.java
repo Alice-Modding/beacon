@@ -24,7 +24,7 @@
 //import java.util.regex.Matcher;
 //import java.util.stream.Stream;
 //
-//import static ppl.beacon.fake.chunk.FakeChunkStorage.REGION_FILE_PATTERN;
+//import static ppl.beacon.fake.chunk.storage.FakeChunkStorage.REGION_FILE_PATTERN;
 //
 ///**
 // * Stores approximate (~1 minute resolution) access timestamps for region files of a given folder.

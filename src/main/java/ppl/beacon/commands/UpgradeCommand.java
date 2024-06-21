@@ -7,7 +7,8 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.text.Text;
 import ppl.beacon.fake.chunk.FakeChunkManager;
-import ppl.beacon.fake.chunk.FakeChunkStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorageManager;
 import ppl.beacon.fake.world.WorldManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 
@@ -32,7 +33,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
         }
 
         WorldManager worlds = bobbyChunkManager.getWorlds();
-        List<FakeChunkStorage> storages;
+        List<FakeStorage> storages;
         if (worlds != null) {
             storages = worlds.getOutdatedWorlds();
         } else {
@@ -42,7 +43,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
         source.sendFeedback(Text.translatable("beacon.upgrade.begin"));
         new Thread(() -> {
             for (int i = 0; i < storages.size(); i++) {
-                FakeChunkStorage storage = storages.get(i);
+                FakeStorage storage = storages.get(i);
                 try {
                     storage.upgrade(world.getRegistryKey(), new ProgressReported(client, i, storages.size()));
                 } catch (IOException e) {

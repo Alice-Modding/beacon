@@ -11,7 +11,8 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.util.math.ChunkPos;
-import ppl.beacon.fake.chunk.FakeChunkStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorage;
+import ppl.beacon.fake.chunk.storage.FakeStorageManager;
 import ppl.beacon.utils.RegionPos;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ public class World {
     protected final Int2ObjectMap<Match> matchingWorlds = new Int2ObjectOpenHashMap<>();
     protected final IntSet nonMatchingWorlds = new IntOpenHashSet();
 
-    protected final FakeChunkStorage storage;
+    protected final FakeStorage storage;
 
     protected MergeState mergeState;
 
@@ -46,7 +47,7 @@ public class World {
     public World(int id, int version, WorldManager manager) {
         this.id = id;
         this.version = version;
-        this.storage = FakeChunkStorage.getFor(directory(), true);
+        this.storage = FakeStorageManager.getFor(directory(), true);
         this.manager = manager;
     }
 

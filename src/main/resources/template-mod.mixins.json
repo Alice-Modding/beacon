@@ -4,6 +4,10 @@
 	"compatibilityLevel": "JAVA_21",
 	"plugin": "ppl.beacon.MixinConfigPlugin",
 	"mixins": [
+		"option.sodium.SodiumChunkManagerMixin",
+		"option.sodium.SodiumClientPlayNetworkHandlerMixin",
+		"option.sodium.SodiumGameOptionPagesMixin",
+
 		"option.BackgroundRendererMixin",
 		"option.ClientSettingsC2SPacketMixin",
 		"option.GameOptionsMixin",
