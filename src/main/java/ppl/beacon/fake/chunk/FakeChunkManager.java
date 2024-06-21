@@ -48,7 +48,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class FakeChunkManager {
-    private static final String FALLBACK_LEVEL_NAME = "bobby-fallback";
+    private static final String FALLBACK_LEVEL_NAME = "beacon-fallback";
     private static final MinecraftClient client = MinecraftClient.getInstance();
 
     private final ClientWorld world;
@@ -72,11 +72,11 @@ public class FakeChunkManager {
     // they are submitted.
     // The size of the pool must be sufficiently large such that there is always at least one query operation
     // running, as otherwise the storage io worker will start writing chunks which slows everything down to a crawl.
-    private static final ExecutorService loadExecutor = Executors.newFixedThreadPool(8, new DefaultThreadFactory("bobby-loading", true));
+    private static final ExecutorService loadExecutor = Executors.newFixedThreadPool(8, new DefaultThreadFactory("beacon-loading", true));
     private final Long2ObjectMap<LoadingJob> loadingJobs = new Long2ObjectLinkedOpenHashMap<>();
 
     // Executor for serialization and saving. Single-threaded so we do not have to worry about races between multiple saves for the same chunk.
-    private static final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("bobby-saving", true));
+    private static final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("beacon-saving", true));
 
     private final Long2ObjectMap<FingerprintJob> fingerprintJobs = new Long2ObjectLinkedOpenHashMap<>();
 
@@ -85,7 +85,7 @@ public class FakeChunkManager {
         this.clientChunkManager = clientChunkManager;
         this.clientChunkManagerExt = (ClientChunkManagerExt) clientChunkManager;
 
-        RanderConfig config = Config.renderer;
+        RanderConfig config = BeaconMod.getConfig().getRanderConfig();
 
         String serverName = getCurrentWorldOrServerName(((ClientWorldAccessor) world).getNetworkHandler());
         long seedHash = ((BiomeAccessAccessor) world.getBiomeAccess()).getSeed();
@@ -93,7 +93,7 @@ public class FakeChunkManager {
         Identifier worldId = worldKey.getValue();
         Path storagePath = client.runDirectory
                 .toPath()
-                .resolve(".bobby");
+                .resolve(".beacon");
         if (oldFolderExists(storagePath, serverName)) {
             storagePath = storagePath.resolve(serverName);
         } else {
@@ -166,7 +166,7 @@ public class FakeChunkManager {
         ClientPlayerEntity player = client.player;
         if (player == null) return;
 
-        RanderConfig config = Config.renderer;
+        RanderConfig config = BeaconMod.getConfig().getRanderConfig();
         long time = Util.getMeasuringTimeMs();
 
         List<LoadingJob> newJobs = new ArrayList<>();

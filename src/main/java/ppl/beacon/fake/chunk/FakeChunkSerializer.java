@@ -25,6 +25,7 @@ import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ppl.beacon.BeaconMod;
 import ppl.beacon.config.Config;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
 import ppl.beacon.fake.ext.LightingProviderExt;
@@ -228,7 +229,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
 
         Heightmap.populateHeightmaps(chunk, missingHightmapTypes);
 
-        if (!Config.renderer.isNoBlockEntities()) {
+        if (!BeaconMod.getConfig().getRanderConfig().isNoBlockEntities()) {
             NbtList blockEntitiesTag = nbtCompound.getList("block_entities", NbtElement.COMPOUND_TYPE);
             for (int i = 0; i < blockEntitiesTag.size(); i++) {
                 chunk.addPendingBlockEntityNbt(blockEntitiesTag.getCompound(i));
@@ -316,7 +317,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
                     skyLightProvider.beacon$addSectionData(ChunkSectionPos.from(pos, y).asLong(), skyLight[i + 1]);
             }
 
-            chunk.setTinted(Config.renderer.isTintFakeChunks());
+            chunk.setTinted(BeaconMod.getConfig().getRanderConfig().isTintFakeChunks());
 
             // MC lazily loads block entities when they are first accessed.
             // It does so in a thread-unsafe way though, so if they are first accessed from e.g. a render thread, this

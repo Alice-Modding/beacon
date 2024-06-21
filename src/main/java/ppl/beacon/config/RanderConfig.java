@@ -8,7 +8,7 @@ public class RanderConfig {
     public static final RanderConfig DEFAULT = new RanderConfig();
 
     private boolean enabled = true;
-    @Comment("Enables support for servers with multiple identically-named worlds.\n\nWhen enabled, a new local cache is started on each world change. If there are enough chunks with similar content in two caches, they will automatically be merged.\nThis does mean that you may need to walk around a little before Bobby loads in cached chunks if there is little identifying information in your world (e.g. flat worlds).\n\nYou may need to delete your existing cache if it is comprised of multiple worlds to prevent Bobby from merging into it.\nRequires a `/bobby upgrade` after enabling with existing cache.")
+    @Comment("Enables support for servers with multiple identically-named worlds.\n\nWhen enabled, a new local cache is started on each world change. If there are enough chunks with similar content in two caches, they will automatically be merged.\nThis does mean that you may need to walk around a little before Beacon loads in cached chunks if there is little identifying information in your world (e.g. flat worlds).\n\nYou may need to delete your existing cache if it is comprised of multiple worlds to prevent Beacon from merging into it.\nRequires a `/beacon upgrade` after enabling with existing cache.")
     private boolean dynamicMultiWorld = false;
     @Comment("Do not load block entities (e.g. chests) in fake chunks.\nThese need updating every tick which can add up.\n\nEnabled by default because the render distance for block entities is usually smaller than the server-view distance anyway.")
     private boolean noBlockEntities = true;
@@ -20,7 +20,7 @@ public class RanderConfig {
     private int deleteUnusedRegionsAfterDays = -1;
     @Comment("Changes the maximum value configurable for Render Distance.\n\nRequires Sodium.")
     private int maxRenderDistance = 32;
-    @Comment("Overwrites the view-distance of the integrated server.\nThis allows Bobby to be useful in Singleplayer.\n\nDisabled when at 0.\nBobby is active in singleplayer only if this is enabled.\nRequires re-log to en-/disable.")
+    @Comment("Overwrites the view-distance of the integrated server.\nThis allows Beacon to be useful in Singleplayer.\n\nDisabled when at 0.\nBeacon is active in singleplayer only if this is enabled.\nRequires re-log to en-/disable.")
     private int viewDistanceOverwrite = 0;
 
     public RanderConfig() {}

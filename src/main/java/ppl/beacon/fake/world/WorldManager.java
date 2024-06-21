@@ -77,7 +77,7 @@ public class WorldManager implements AutoCloseable {
 
         if (outdatedWorlds.isEmpty()) return;
 
-        Text text = translatable("bobby.upgrade.required");
+        Text text = translatable("beacon.upgrade.required");
         MinecraftClient client = MinecraftClient.getInstance();
         client.submit(() -> client.inGameHud.getChatHud().addMessage(text));
     }
@@ -1006,7 +1006,7 @@ public class WorldManager implements AutoCloseable {
     private World getWorldForCommand(FabricClientCommandSource source, int id) {
         World world = worlds.get(id);
         if (world == null) {
-            source.sendError(translatable("No active world with id %s. Run `/bobby worlds` for a list of available worlds.", id));
+            source.sendError(translatable("No active world with id %s. Run `/beacon worlds` for a list of available worlds.", id));
             return null;
         }
         return world;
@@ -1054,7 +1054,7 @@ public class WorldManager implements AutoCloseable {
             }
 
             merge(sourceWorld, targetWorld);
-            source.sendFeedback(translatable("Queued merge of %s into %s. Run `/bobby worlds` for status.", sourceWorld, targetWorld));
+            source.sendFeedback(translatable("Queued merge of %s into %s. Run `/beacon worlds` for status.", sourceWorld, targetWorld));
         } finally {
             lock.writeLock().unlock();
         }
@@ -1125,7 +1125,7 @@ public class WorldManager implements AutoCloseable {
         }
 
         if (!outdatedWorlds.isEmpty()) {
-            source.sendFeedback(translatable("Outdated worlds (run `/bobby upgrade`):"));
+            source.sendFeedback(translatable("Outdated worlds (run `/beacon upgrade`):"));
             for (World world : outdatedWorlds) {
                 source.sendFeedback(translatable("  - World %s (%s regions)", world, world.knownRegions.size()));
             }
@@ -1155,7 +1155,7 @@ public class WorldManager implements AutoCloseable {
                 }
             }
             if (!futures.isEmpty()) {
-                source.sendFeedback(translatable("Loading %s regions.. (run `/bobby worlds` to see progress)", futures.size()));
+                source.sendFeedback(translatable("Loading %s regions.. (run `/beacon worlds` to see progress)", futures.size()));
                 CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
                         .thenRunAsync(() -> sendInfo(source, true), MinecraftClient.getInstance());
                 return;
@@ -1173,12 +1173,12 @@ public class WorldManager implements AutoCloseable {
                 }
             }
             if (!futures.isEmpty()) {
-                source.sendFeedback(translatable("Computing fingerprints for %s chunks.. (run `/bobby worlds` to see progress)", futures.size()));
+                source.sendFeedback(translatable("Computing fingerprints for %s chunks.. (run `/beacon worlds` to see progress)", futures.size()));
                 CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
                         .thenRunAsync(() -> sendInfo(source, false), MinecraftClient.getInstance());
             }
         } else {
-            source.sendFeedback(translatable("Run `/bobby worlds full` to load non-loaded regions and compute the state of currently unknown chunks."));
+            source.sendFeedback(translatable("Run `/beacon worlds full` to load non-loaded regions and compute the state of currently unknown chunks."));
         }
     }
 

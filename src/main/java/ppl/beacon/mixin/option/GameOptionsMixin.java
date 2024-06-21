@@ -30,7 +30,7 @@ public class GameOptionsMixin {
             index = 1
     )
     private int considerBobbyMaxRenderDistanceSetting(int vanillaSetting) {
-        int bobbySetting = Config.renderer.getMaxRenderDistance();
+        int bobbySetting = BeaconMod.getConfig().getRanderConfig().getMaxRenderDistance();
         return Math.max(vanillaSetting, bobbySetting);
     }
 }

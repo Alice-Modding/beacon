@@ -27,7 +27,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
         ClientChunkManagerExt chunkManager = (ClientChunkManagerExt) world.getChunkManager();
         FakeChunkManager bobbyChunkManager = chunkManager.beacon$getFakeChunkManager();
         if (bobbyChunkManager == null) {
-            source.sendError(Text.translatable("bobby.upgrade.not_enabled"));
+            source.sendError(Text.translatable("beacon.upgrade.not_enabled"));
             return 0;
         }
 
@@ -39,7 +39,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
             storages = List.of(bobbyChunkManager.getStorage());
         }
 
-        source.sendFeedback(Text.translatable("bobby.upgrade.begin"));
+        source.sendFeedback(Text.translatable("beacon.upgrade.begin"));
         new Thread(() -> {
             for (int i = 0; i < storages.size(); i++) {
                 FakeChunkStorage storage = storages.get(i);
@@ -57,10 +57,10 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
                 if (worlds != null) {
                     worlds.recheckChunks(world, chunkManager.beacon$getRealChunksTracker());
                 }
-                source.sendFeedback(Text.translatable("bobby.upgrade.done"));
+                source.sendFeedback(Text.translatable("beacon.upgrade.done"));
                 bobbyChunkManager.loadMissingChunksFromCache();
             });
-        }, "bobby-upgrade").start();
+        }, "beacon-upgrade").start();
 
         return 0;
     }
@@ -88,7 +88,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
             if (now.isAfter(nextReport) || this.done == this.total) {
                 nextReport = now.plus(3, ChronoUnit.SECONDS);
 
-                Text text = Text.translatable("bobby.upgrade.progress", this.done, this.total, this.worldIndex + 1, this.totalWorlds);
+                Text text = Text.translatable("beacon.upgrade.progress", this.done, this.total, this.worldIndex + 1, this.totalWorlds);
                 client.submit(() -> client.inGameHud.getChatHud().addMessage(text));
             }
         }

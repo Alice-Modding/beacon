@@ -9,10 +9,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Implements the "Flawless Frames" FREX feature using which third-party mods can instruct Bobby to sacrifice
+ * Implements the "Flawless Frames" FREX feature using which third-party mods can instruct Beacon to sacrifice
  * performance (even beyond the point where it can no longer achieve interactive frame rates) in exchange for
  * a noticeable boost to quality.
- * In Bobby's case, this means blocking loading all chunks are loaded from the cache.
+ * In Beacon's case, this means blocking loading all chunks are loaded from the cache.
  * See <a href="https://github.com/grondag/frex/pull/9">the link</a>
  */
 public class FlawlessFrames {

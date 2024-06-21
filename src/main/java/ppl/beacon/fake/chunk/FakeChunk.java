@@ -17,6 +17,7 @@ import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.ChunkLightingView;
 import net.minecraft.world.chunk.light.LightingProvider;
 import net.minecraft.world.tick.ChunkTickScheduler;
+import ppl.beacon.BeaconMod;
 import ppl.beacon.config.Config;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
 
@@ -60,7 +61,7 @@ public class FakeChunk extends WorldChunk {
             if (blockEntityTag == null) continue;
 
             blockEntitiesTag.add(blockEntityTag);
-            if (!Config.renderer.isNoBlockEntities()) addPendingBlockEntityNbt(blockEntityTag);
+            if (!BeaconMod.getConfig().getRanderConfig().isNoBlockEntities()) addPendingBlockEntityNbt(blockEntityTag);
         }
         serializedBlockEntities = blockEntitiesTag;
     }

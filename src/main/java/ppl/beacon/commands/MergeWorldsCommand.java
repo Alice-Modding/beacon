@@ -19,13 +19,13 @@ public class MergeWorldsCommand implements Command<FabricClientCommandSource> {
 
         FakeChunkManager chunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
         if (chunkManager == null) {
-            source.sendError(Text.translatable("bobby.upgrade.not_enabled"));
+            source.sendError(Text.translatable("beacon.upgrade.not_enabled"));
             return 0;
         }
 
         WorldManager worlds = chunkManager.getWorlds();
         if (worlds == null) {
-            source.sendError(Text.translatable("bobby.dynamic_multi_world.not_enabled"));
+            source.sendError(Text.translatable("beacon.dynamic_multi_world.not_enabled"));
             return 0;
         }
 

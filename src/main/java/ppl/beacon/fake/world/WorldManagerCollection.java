@@ -28,7 +28,7 @@ public class WorldManagerCollection {
 
 
     // Executor for saving. Single-threaded so we do not have to worry about races between multiple saves.
-    protected static final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("bobby-meta-saving", true));
+    protected static final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("beacon-meta-saving", true));
     protected static final LimitedExecutor copyExecutor = new LimitedExecutor(Util.getIoWorkerExecutor(), CONCURRENT_COPY_JOBS);
 
     protected static final Executor computeFingerprintExecutor = new LimitedExecutor(Util.getIoWorkerExecutor(), CONCURRENT_FINGERPRINT_JOBS);

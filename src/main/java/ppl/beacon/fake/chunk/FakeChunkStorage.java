@@ -71,7 +71,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
 
     private FakeChunkStorage(Path directory, boolean writeable) {
         super(
-                new StorageKey("dummy", World.OVERWORLD, "bobby"),
+                new StorageKey("dummy", World.OVERWORLD, "beacon"),
                 directory,
                 MinecraftClient.getInstance().getDataFixer(),
                 false
@@ -129,7 +129,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
             if (sentUpgradeNotification.compareAndSet(false, true)) {
                 MinecraftClient client = MinecraftClient.getInstance();
                 client.submit(() -> {
-                    Text text = Text.translatable(writeable ? "bobby.upgrade.required" : "bobby.upgrade.fallback_world");
+                    Text text = Text.translatable(writeable ? "beacon.upgrade.required" : "beacon.upgrade.fallback_world");
                     client.submit(() -> client.inGameHud.getChatHud().addMessage(text));
                 });
             }
@@ -164,7 +164,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
 
         // We ideally split the actual work of upgrading the chunk NBT across multiple threads, leaving a few for MC
         int workThreads = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
-        ExecutorService workExecutor = Executors.newFixedThreadPool(workThreads, new DefaultThreadFactory("bobby-upgrade-worker", true));
+        ExecutorService workExecutor = Executors.newFixedThreadPool(workThreads, new DefaultThreadFactory("beacon-upgrade-worker", true));
 
         try {
             for (ChunkPos chunkPos : chunks) {
@@ -182,7 +182,7 @@ public class FakeChunkStorage extends VersionedChunkStorage {
                         return;
                     }
 
-                    // Didn't have this set prior to Bobby 4.0.5 and upgrading from 1.18 to 1.19 wipes light data
+                    // Didn't have this set prior to Beacon 4.0.5 and upgrading from 1.18 to 1.19 wipes light data
                     // from chunks that don't have this set, so we need to set it before we upgrade the chunk.
                     nbt.putBoolean("isLightOn", true);
 

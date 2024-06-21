@@ -11,7 +11,7 @@ import ppl.beacon.config.Config;
 public abstract class SodiumGameOptionPagesMixin {
     @ModifyConstant(method = "lambda$general$0", constant = @Constant(intValue = 32))
     private static int bobbyMaxRenderDistance(int oldValue) {
-        int overwrite = Config.renderer.getMaxRenderDistance();
+        int overwrite = BeaconMod.getConfig().getRanderConfig().getMaxRenderDistance();
         return Math.max(3, overwrite);
     }
 }

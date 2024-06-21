@@ -24,13 +24,13 @@ public class WorldsCommand implements Command<FabricClientCommandSource> {
 
         FakeChunkManager bobbyChunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
         if (bobbyChunkManager == null) {
-            source.sendError(Text.translatable("bobby.upgrade.not_enabled"));
+            source.sendError(Text.translatable("beacon.upgrade.not_enabled"));
             return 0;
         }
 
         WorldManager worlds = bobbyChunkManager.getWorlds();
         if (worlds == null) {
-            source.sendError(Text.translatable("bobby.dynamic_multi_world.not_enabled"));
+            source.sendError(Text.translatable("beacon.dynamic_multi_world.not_enabled"));
             return 0;
         }
 

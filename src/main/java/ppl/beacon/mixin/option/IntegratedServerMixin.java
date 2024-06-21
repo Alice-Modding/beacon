@@ -11,7 +11,7 @@ import ppl.beacon.config.Config;
 public abstract class IntegratedServerMixin {
     @ModifyArg(method = "tick", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(II)I"), index = 1)
     private int viewDistanceOverwrite(int viewDistance) {
-        int overwrite = Config.renderer.getViewDistanceOverwrite();
+        int overwrite = BeaconMod.getConfig().getRanderConfig().getViewDistanceOverwrite();
         if (overwrite != 0) {
             viewDistance = overwrite;
         }

@@ -37,7 +37,7 @@
 //    private static final String FILE_NAME = "last_access";
 //
 //    private final Path path;
-//    private final Thread finalSaveThread = new Thread(this::saveOrLog, "bobby-save-last-access");
+//    private final Thread finalSaveThread = new Thread(this::saveOrLog, "beacon-save-last-access");
 //    private boolean closed;
 //
 //    private final Long2LongMap accessMap;
