@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ppl.beacon.fake.chunk.FakeChunkManager;
-import ppl.beacon.fake.chunk.storage.FakeStorageManager;
+import ppl.beacon.fake.storage.FakeStorageManager;
 import ppl.beacon.fake.world.WorldManagerCollection;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 

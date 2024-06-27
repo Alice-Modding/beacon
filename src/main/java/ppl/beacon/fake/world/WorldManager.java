@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.util.math.ChunkPos;
-import ppl.beacon.fake.chunk.storage.FakeStorage;
+import ppl.beacon.fake.storage.FakeStorage;
 import ppl.beacon.fake.chunk.VisibleChunksTracker;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.*;

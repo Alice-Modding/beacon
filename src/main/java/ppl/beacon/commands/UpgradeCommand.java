@@ -7,8 +7,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.text.Text;
 import ppl.beacon.fake.chunk.FakeChunkManager;
-import ppl.beacon.fake.chunk.storage.FakeStorage;
-import ppl.beacon.fake.chunk.storage.FakeStorageManager;
+import ppl.beacon.fake.storage.FakeStorage;
 import ppl.beacon.fake.world.WorldManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 

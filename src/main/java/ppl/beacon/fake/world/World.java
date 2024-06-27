@@ -11,8 +11,8 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.util.math.ChunkPos;
-import ppl.beacon.fake.chunk.storage.FakeStorage;
-import ppl.beacon.fake.chunk.storage.FakeStorageManager;
+import ppl.beacon.fake.storage.FakeStorage;
+import ppl.beacon.fake.storage.FakeStorageManager;
 import ppl.beacon.utils.RegionPos;
 
 import java.io.IOException;
