@@ -1,4 +1,4 @@
-package ppl.beacon.fake.chunk;
+package ppl.beacon.fake;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
 import it.unimi.dsi.fastutil.longs.*;
@@ -25,6 +25,9 @@ import net.minecraft.world.level.storage.LevelStorage;
 import org.apache.commons.lang3.tuple.Pair;
 import ppl.beacon.BeaconMod;
 import ppl.beacon.config.RanderConfig;
+import ppl.beacon.fake.chunk.FakeChunk;
+import ppl.beacon.fake.chunk.FakeChunkSerializer;
+import ppl.beacon.fake.chunk.VisibleChunksTracker;
 import ppl.beacon.fake.storage.FakeStorage;
 import ppl.beacon.fake.storage.FakeStorageManager;
 import ppl.beacon.fake.ext.ChunkLightProviderExt;
@@ -46,7 +49,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class FakeChunkManager {
+public class FakeManager {
     private static final String FALLBACK_LEVEL_NAME = "beacon-fallback";
     private static final MinecraftClient client = MinecraftClient.getInstance();
 
@@ -93,7 +96,7 @@ public class FakeChunkManager {
         return storagePath;
     }
 
-    public FakeChunkManager(ClientWorld world, ClientChunkManager clientChunkManager) {
+    public FakeManager(ClientWorld world, ClientChunkManager clientChunkManager) {
         this.world = world;
         this.clientChunkManager = clientChunkManager;
         this.clientChunkManagerExt = (ClientChunkManagerExt) clientChunkManager;

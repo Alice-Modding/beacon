@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ppl.beacon.fake.chunk.FakeChunkManager;
+import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.storage.FakeStorageManager;
 import ppl.beacon.fake.world.WorldManagerCollection;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
@@ -28,8 +28,8 @@ public abstract class MinecraftClientMixin {
     @Inject(method = "render", at = @At(value = "CONSTANT", args = "stringValue=tick"))
     private void beacon$render(CallbackInfo ci) {
         if (world == null) return;
-        FakeChunkManager chunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
-        if (chunkManager == null) return;
+        FakeManager fakeManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
+        if (fakeManager == null) return;
 
         profiler.push("bobbyUpdate");
 
@@ -37,7 +37,7 @@ public abstract class MinecraftClientMixin {
         // Arbitrarily choosing 1/4 of frame time as our max budget, that way we're hopefully not noticeable.
         long frameBudget = frameTime / 4;
         long timeLimit = Util.getMeasuringTimeNano() + frameBudget;
-        chunkManager.update(() -> Util.getMeasuringTimeNano() < timeLimit);
+        fakeManager.update(() -> Util.getMeasuringTimeNano() < timeLimit);
 
         profiler.pop();
     }

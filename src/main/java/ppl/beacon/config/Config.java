@@ -14,8 +14,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 import org.spongepowered.configurate.reference.ConfigurationReference;
 import org.spongepowered.configurate.reference.ValueReference;
 import org.spongepowered.configurate.reference.WatchServiceListener;
+import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.chunk.FakeChunk;
-import ppl.beacon.fake.chunk.FakeChunkManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 import ppl.beacon.mixin.option.SimpleOptionAccessor;
 import ppl.beacon.mixin.option.ValidatingIntSliderCallbacksAccessor;
@@ -89,10 +89,10 @@ public class Config {
             ClientWorld world = client.world;
             if (world == null) return;
 
-            FakeChunkManager bobbyChunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
-            if (bobbyChunkManager == null) return;
+            FakeManager fakeManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
+            if (fakeManager == null) return;
 
-            for (WorldChunk fakeChunk : bobbyChunkManager.getFakeChunks()) {
+            for (WorldChunk fakeChunk : fakeManager.getFakeChunks()) {
                 ((FakeChunk) fakeChunk).setTinted(enabled);
             }
         }

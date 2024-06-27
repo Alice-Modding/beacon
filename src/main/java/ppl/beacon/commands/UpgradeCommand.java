@@ -6,7 +6,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.text.Text;
-import ppl.beacon.fake.chunk.FakeChunkManager;
+import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.storage.FakeStorage;
 import ppl.beacon.fake.world.WorldManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
@@ -25,18 +25,18 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
         ClientWorld world = source.getWorld();
 
         ClientChunkManagerExt chunkManager = (ClientChunkManagerExt) world.getChunkManager();
-        FakeChunkManager bobbyChunkManager = chunkManager.beacon$getFakeChunkManager();
-        if (bobbyChunkManager == null) {
+        FakeManager fakeManager = chunkManager.beacon$getFakeChunkManager();
+        if (fakeManager == null) {
             source.sendError(Text.translatable("beacon.upgrade.not_enabled"));
             return 0;
         }
 
-        WorldManager worlds = bobbyChunkManager.getWorlds();
+        WorldManager worlds = fakeManager.getWorlds();
         List<FakeStorage> storages;
         if (worlds != null) {
             storages = worlds.getOutdatedWorlds();
         } else {
-            storages = List.of(bobbyChunkManager.getStorage());
+            storages = List.of(fakeManager.getStorage());
         }
 
         source.sendFeedback(Text.translatable("beacon.upgrade.begin"));
@@ -58,7 +58,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
                     worlds.recheckChunks(world, chunkManager.beacon$getRealChunksTracker());
                 }
                 source.sendFeedback(Text.translatable("beacon.upgrade.done"));
-                bobbyChunkManager.loadMissingChunksFromCache();
+                fakeManager.loadMissingChunksFromCache();
             });
         }, "beacon-upgrade").start();
 

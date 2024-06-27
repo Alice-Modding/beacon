@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ppl.beacon.fake.chunk.FakeChunkManager;
+import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 import ppl.beacon.utils.FlawlessFrames;
 
@@ -27,12 +27,12 @@ public abstract class GameRendererMixin {
         ClientWorld world = this.client.world;
         if (world == null) return;
 
-        FakeChunkManager chunkManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
-        if (chunkManager == null) return;
+        FakeManager fakeManager = ((ClientChunkManagerExt) world.getChunkManager()).beacon$getFakeChunkManager();
+        if (fakeManager == null) return;
 
         this.client.getProfiler().push("bobbyUpdate");
 
-        chunkManager.update(() -> true);
+        fakeManager.update(() -> true);
 
         this.client.getProfiler().pop();
     }
