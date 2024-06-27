@@ -4,10 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
-import ppl.beacon.commands.CreateWorldCommand;
-import ppl.beacon.commands.MergeWorldsCommand;
 import ppl.beacon.commands.UpgradeCommand;
-import ppl.beacon.commands.WorldsCommand;
 import ppl.beacon.config.Config;
 import ppl.beacon.config.RanderConfig;
 import ppl.beacon.utils.FlawlessFrames;
@@ -37,14 +34,6 @@ public class BeaconMod implements ClientModInitializer {
 
         ClientCommandRegistrationCallback.EVENT.register(((dispatcher, registryAccess) ->
                 dispatcher.register(literal("beacon")
-                        .then(literal("worlds").executes(new WorldsCommand(false))
-                                .then(literal("full").executes(new WorldsCommand(true)))
-                                .then(literal("merge")
-                                        .then(argument("source", integer())
-                                                .then(argument("target", integer())
-                                                        .executes(new MergeWorldsCommand()))))
-                                .then(literal("create").executes(new CreateWorldCommand()))
-                        )
                         .then(literal("upgrade").executes(new UpgradeCommand())))));
 
         FlawlessFrames.onClientInitialization();

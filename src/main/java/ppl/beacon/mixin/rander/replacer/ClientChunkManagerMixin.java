@@ -87,13 +87,6 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
         fakeManager.unload(x, z, true);
     }
 
-    @Inject(method = "loadChunkFromPacket", at = @At("RETURN"))
-    private void beacon$FingerprintRealChunk(CallbackInfoReturnable<WorldChunk> cir) {
-        if (fakeManager == null) return;
-
-        fakeManager.fingerprint(cir.getReturnValue());
-    }
-
     @Unique
     private void saveRealChunk(long chunkPos) {
         int chunkX = ChunkPos.getPackedX(chunkPos);

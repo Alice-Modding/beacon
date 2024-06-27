@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.storage.FakeStorageManager;
-import ppl.beacon.fake.world.WorldManagerCollection;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 
 @Mixin(MinecraftClient.class)
@@ -44,7 +43,6 @@ public abstract class MinecraftClientMixin {
 
     @Inject(method = "disconnect(Lnet/minecraft/client/gui/screen/Screen;)V", at = @At("RETURN"))
     private void beacon$disconnect(CallbackInfo ci) {
-        WorldManagerCollection.closeAll();
         FakeStorageManager.closeAll();
     }
 }

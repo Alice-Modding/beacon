@@ -8,7 +8,6 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.text.Text;
 import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.storage.FakeStorage;
-import ppl.beacon.fake.world.WorldManager;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 
 import java.io.IOException;
@@ -31,13 +30,7 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
             return 0;
         }
 
-        WorldManager worlds = fakeManager.getWorlds();
-        List<FakeStorage> storages;
-        if (worlds != null) {
-            storages = worlds.getOutdatedWorlds();
-        } else {
-            storages = List.of(fakeManager.getStorage());
-        }
+        List<FakeStorage> storages = List.of(fakeManager.getStorage());
 
         source.sendFeedback(Text.translatable("beacon.upgrade.begin"));
         new Thread(() -> {
@@ -49,14 +42,8 @@ public class UpgradeCommand implements Command<FabricClientCommandSource> {
                     e.printStackTrace();
                     source.sendError(Text.of(e.getMessage()));
                 }
-                if (worlds != null) {
-                    worlds.markAsUpToDate(storage);
-                }
             }
             client.submit(() -> {
-                if (worlds != null) {
-                    worlds.recheckChunks(world, chunkManager.beacon$getRealChunksTracker());
-                }
                 source.sendFeedback(Text.translatable("beacon.upgrade.done"));
                 fakeManager.loadMissingChunksFromCache();
             });
