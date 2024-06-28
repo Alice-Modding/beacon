@@ -52,76 +52,70 @@ public class FakeManager {
     private static final MinecraftClient client = MinecraftClient.getInstance();
 
     private final ClientWorld world;
+    private final FakeStorage storage;
 
     private final ClientChunkManagerExt clientChunkManagerExt;
     private final ClientChunkManager clientChunkManager;
 
-    private final List<Function<ChunkPos, CompletableFuture<Optional<NbtCompound>>>> storages = new ArrayList<>();
-    private final FakeStorage storage;
+    private final LoadingManager loading = new LoadingManager();
+
 
     private int ticksSinceLastSave;
 
     private final Long2ObjectMap<WorldChunk> fakeChunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
     private final VisibleChunksTracker chunkTracker = new VisibleChunksTracker();
-    private final Long2LongMap toBeUnloaded = new Long2LongOpenHashMap();
+
     // Contains chunks in order to be unloaded. We keep the chunk and time so we can cross-reference it with
     // [toBeUnloaded] to see if the entry has since been removed / the time reset. This way we do not need
     // to remove entries from the middle of the queue.
     private final Deque<Pair<Long, Long>> unloadQueue = new ArrayDeque<>();
+    private final Long2LongMap toBeUnloaded = new Long2LongOpenHashMap();
 
-    // The api for loading chunks unfortunately does not handle cancellation, so we utilize a separate thread pool to
-    // ensure only a small number of tasks are active at any one time, and all others can still be cancelled before
-    // they are submitted.
-    // The size of the pool must be sufficiently large such that there is always at least one query operation
-    // running, as otherwise the storage io worker will start writing chunks which slows everything down to a crawl.
-    private static final ExecutorService loadExecutor = Executors.newFixedThreadPool(8, new DefaultThreadFactory("beacon-loading", true));
-    private final Long2ObjectMap<LoadingJob> loadingJobs = new Long2ObjectLinkedOpenHashMap<>();
 
     // Executor for serialization and saving. Single-threaded so we do not have to worry about races between multiple saves for the same chunk.
     private static final ExecutorService saveExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("beacon-saving", true));
 
 
-    private Path getStoragePath(String serverName) {
+    private static String getCurrentWorldOrServerName(ClientPlayNetworkHandler networkHandler) {
+        IntegratedServer integratedServer = client.getServer();
+        if (integratedServer != null) {
+            return integratedServer.getSaveProperties().getLevelName();
+        }
+
+        ServerInfo serverInfo = networkHandler.getServerInfo();
+        if (serverInfo != null) {
+            if (serverInfo.isRealm()) {
+                return "realms";
+            }
+            return serverInfo.address.replace(':', '_');
+        }
+
+        return "unknown";
+    }
+
+    private Path getStoragePath() {
+
+        String serverName = getCurrentWorldOrServerName(((ClientWorldAccessor) world).getNetworkHandler());
         Path storagePath = client.runDirectory.toPath().resolve(".beacon");
+        long seedHash = ((BiomeAccessAccessor) world.getBiomeAccess()).getSeed();
+        Identifier worldId = world.getRegistryKey().getValue();
 
         if (FileSystemUtils.oldFolderExists(storagePath, serverName)) {
             storagePath = storagePath.resolve(serverName);
         } else {
             storagePath = FileSystemUtils.resolveSafeDirectoryName(storagePath, serverName);
         }
-        return storagePath;
+        return storagePath
+                .resolve(seedHash + "")
+                .resolve(worldId.getNamespace())
+                .resolve(worldId.getPath());
     }
 
     public FakeManager(ClientWorld world, ClientChunkManager clientChunkManager) {
         this.world = world;
         this.clientChunkManager = clientChunkManager;
         this.clientChunkManagerExt = (ClientChunkManagerExt) clientChunkManager;
-
-        RanderConfig config = BeaconMod.getConfig().getRanderConfig();
-
-        String serverName = getCurrentWorldOrServerName(((ClientWorldAccessor) world).getNetworkHandler());
-        long seedHash = ((BiomeAccessAccessor) world.getBiomeAccess()).getSeed();
-        RegistryKey<World> worldKey = world.getRegistryKey();
-        Identifier worldId = worldKey.getValue();
-
-        Path storagePath = getStoragePath(serverName)
-                .resolve(seedHash + "")
-                .resolve(worldId.getNamespace())
-                .resolve(worldId.getPath());
-
-
-        storage = FakeStorageManager.getFor(storagePath, true);
-        storages.add(storage::loadChunk);
-
-        LevelStorage levelStorage = client.getLevelStorage();
-        if (levelStorage.levelExists(FALLBACK_LEVEL_NAME)) {
-            try (LevelStorage.Session session = levelStorage.createSession(FALLBACK_LEVEL_NAME)) {
-                Path worldDirectory = session.getWorldDirectory(worldKey);
-                Path regionDirectory = worldDirectory.resolve("region");
-                FakeStorage fallbackStorage = FakeStorageManager.getFor(regionDirectory, false);
-                storages.add(fallbackStorage::loadChunk);
-            } catch (Exception ignored) {}
-        }
+        this.storage = FakeStorageManager.getFor(getStoragePath(), true);
     }
 
     public WorldChunk getChunk(int x, int z) {
@@ -153,11 +147,11 @@ public class FakeManager {
 
         List<LoadingJob> newJobs = new ArrayList<>();
         ChunkPos playerChunkPos = player.getChunkPos();
-        int newCenterX =  playerChunkPos.x;
+        int newCenterX = playerChunkPos.x;
         int newCenterZ = playerChunkPos.z;
         chunkTracker.update(newCenterX, newCenterZ, newViewDistance, chunkPos -> {
             // Chunk is now outside view distance, can be unloaded / cancelled
-            cancelLoad(chunkPos);
+            loading.cancel(chunkPos);
             toBeUnloaded.put(chunkPos, time);
             unloadQueue.add(Pair.of(chunkPos, time));
         }, chunkPos -> {
@@ -179,13 +173,7 @@ public class FakeManager {
             newJobs.add(new LoadingJob(new ChunkPos(x, z), distanceSquared));
         });
 
-        if (!newJobs.isEmpty()) {
-            newJobs.sort(LoadingJob.BY_DISTANCE);
-            newJobs.forEach(job -> {
-                loadingJobs.put(job.pos.toLong(), job);
-                loadExecutor.execute(job);
-            });
-        }
+        if (!newJobs.isEmpty()) loading.addAll(newJobs);
 
         // Anything remaining in the set is no longer needed and can now be unloaded
         long unloadTime = time - config.getUnloadDelaySecs() * 1000L;
@@ -224,23 +212,7 @@ public class FakeManager {
             }
         }
 
-
-        ObjectIterator<LoadingJob> loadingJobsIter = this.loadingJobs.values().iterator();
-        while (loadingJobsIter.hasNext()) {
-            LoadingJob loadingJob = loadingJobsIter.next();
-
-            // Still loading, should we wait for it?
-            if (loadingJob.result == null) continue;
-
-            // Done loading
-            loadingJobsIter.remove();
-
-            client.getProfiler().push("loadFakeChunk");
-            loadingJob.complete();
-            client.getProfiler().pop();
-
-            if (!shouldKeepTicking.getAsBoolean()) break;
-        }
+        loading.process(shouldKeepTicking);
     }
 
     public void loadMissingChunksFromCache() {
@@ -255,13 +227,10 @@ public class FakeManager {
         return chunkTracker.isInViewDistance(x, z);
     }
 
-    private CompletableFuture<Optional<NbtCompound>> loadTag(ChunkPos chunkPos, int storageIndex) {
-        return storages.get(storageIndex).apply(chunkPos).thenCompose(maybeTag -> {
+    private CompletableFuture<Optional<NbtCompound>> loadTag(ChunkPos chunkPos) {
+        return storage.loadChunk(chunkPos).thenCompose(maybeTag -> {
             if (maybeTag.isPresent()) {
                 return CompletableFuture.completedFuture(maybeTag);
-            }
-            if (storageIndex + 1 < storages.size()) {
-                return loadTag(chunkPos, storageIndex + 1);
             }
             return CompletableFuture.completedFuture(Optional.empty());
         });
@@ -281,7 +250,7 @@ public class FakeManager {
 
     public boolean unload(int x, int z, boolean willBeReplaced) {
         long chunkPos = ChunkPos.toLong(x, z);
-        cancelLoad(chunkPos);
+        loading.cancel(chunkPos);
         WorldChunk chunk = fakeChunks.remove(chunkPos);
         if (chunk != null) {
             chunk.clear();
@@ -310,13 +279,6 @@ public class FakeManager {
         return false;
     }
 
-    private void cancelLoad(long chunkPos) {
-        LoadingJob loadingJob = loadingJobs.remove(chunkPos);
-        if (loadingJob != null) {
-            loadingJob.cancelled = true;
-        }
-    }
-
     public Supplier<WorldChunk> saveChunk(FakeChunk chunk) {
         LightingProvider lightingProvider = chunk.getWorld().getLightingProvider();
         NbtCompound nbt = FakeChunkSerializer.serialize(chunk, lightingProvider);
@@ -325,33 +287,65 @@ public class FakeManager {
         return FakeChunkSerializer.loadChunk(chunk, chunk.blockLight, chunk.skyLight);
     }
 
-    private static String getCurrentWorldOrServerName(ClientPlayNetworkHandler networkHandler) {
-        IntegratedServer integratedServer = client.getServer();
-        if (integratedServer != null) {
-            return integratedServer.getSaveProperties().getLevelName();
-        }
-
-        ServerInfo serverInfo = networkHandler.getServerInfo();
-        if (serverInfo != null) {
-            if (serverInfo.isRealm()) {
-                return "realms";
-            }
-            return serverInfo.address.replace(':', '_');
-        }
-
-        return "unknown";
-    }
-
     public String getDebugString() {
-        return "F: " + fakeChunks.size() + " L: " + loadingJobs.size() + " U: " + toBeUnloaded.size();
+        return "F: " + fakeChunks.size() + " L: " + loading.size() + " U: " + toBeUnloaded.size();
     }
 
     public Collection<WorldChunk> getFakeChunks() {
         return fakeChunks.values();
     }
 
-    private class LoadingJob implements Runnable {
+    private class LoadingManager {
         public static final Comparator<LoadingJob> BY_DISTANCE = Comparator.comparing(it -> it.distanceSquared);
+
+        // The api for loading chunks unfortunately does not handle cancellation, so we utilize a separate thread pool to
+        // ensure only a small number of tasks are active at any one time, and all others can still be cancelled before
+        // they are submitted.
+        // The size of the pool must be sufficiently large such that there is always at least one query operation
+        // running, as otherwise the storage io worker will start writing chunks which slows everything down to a crawl.
+        private static final ExecutorService loadExecutor = Executors.newFixedThreadPool(8, new DefaultThreadFactory("beacon-loading", true));
+        private final Long2ObjectMap<LoadingJob> loadingJobs = new Long2ObjectLinkedOpenHashMap<>();
+
+        private int size() {
+            return loadingJobs.size();
+        }
+
+        private void cancel(long chunkPos) {
+            LoadingJob loadingJob = loadingJobs.remove(chunkPos);
+            if (loadingJob != null) loadingJob.cancelled = true;
+        }
+
+        private void add(LoadingJob job) {
+            loadingJobs.put(job.pos.toLong(), job);
+            loadExecutor.execute(job);
+        }
+
+        private void addAll(List<LoadingJob> newJobs) {
+            newJobs.sort(BY_DISTANCE);
+            newJobs.forEach(this::add);
+        }
+
+        private void process(BooleanSupplier shouldKeepTicking) {
+            ObjectIterator<LoadingJob> loadingJobsIter = this.loadingJobs.values().iterator();
+            while (loadingJobsIter.hasNext()) {
+                LoadingJob loadingJob = loadingJobsIter.next();
+
+                // Still loading, should we wait for it?
+                if (loadingJob.result == null) continue;
+
+                // Done loading
+                loadingJobsIter.remove();
+
+                client.getProfiler().push("loadFakeChunk");
+                loadingJob.complete();
+                client.getProfiler().pop();
+
+                if (!shouldKeepTicking.getAsBoolean()) break;
+            }
+        }
+    }
+
+    private class LoadingJob implements Runnable {
 
         private final ChunkPos pos;
         private final int distanceSquared;
@@ -369,13 +363,13 @@ public class FakeManager {
             if (cancelled) return;
             Optional<NbtCompound> value;
             try {
-                value = loadTag(pos, 0).get();
+                value = loadTag(pos).get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 value = Optional.empty();
             }
             if (cancelled) return;
-            result = value.map(it -> FakeChunkSerializer.deserialize(FakeChunkSerializer.deserialize(pos, it, world), it, world));
+            result = value.map(it -> FakeChunkSerializer.deserialize(pos, it, world));
         }
 
         public void complete() {
