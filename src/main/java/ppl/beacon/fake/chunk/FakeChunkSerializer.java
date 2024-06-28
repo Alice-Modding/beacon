@@ -181,6 +181,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
             LOGGER.error("Chunk file at {} is in the wrong location; relocating. (Expected {}, got {})", pos, pos, chunkPos);
         }
 
+        Arrays.fill(blockLight, COMPLETELY_DARK);
         DynamicRegistryManager registryManager = world.getRegistryManager();
         Registry<Biome> biomeRegistry = registryManager.get(RegistryKeys.BIOME);
         Codec<PalettedContainer<RegistryEntry<Biome>>> biomeCodec = getPalettedBiomCodec(biomeRegistry);

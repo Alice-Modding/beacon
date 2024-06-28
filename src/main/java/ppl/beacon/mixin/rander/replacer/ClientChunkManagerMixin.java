@@ -84,7 +84,7 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
 
         // This needs to be called unconditionally because even if there is no chunk loaded at the moment,
         // we might already have one queued which we need to cancel as otherwise it will overwrite the real one later.
-        fakeManager.unload(x, z, true);
+        fakeManager.unloadFake(x, z, true);
     }
 
     @Unique
@@ -95,20 +95,10 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
         WorldChunk chunk = getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null || chunk instanceof FakeChunk) return;
 
-        Supplier<WorldChunk> copy = fakeManager.saveChunk(new FakeChunk(chunk));
+        Supplier<WorldChunk> copy = fakeManager.saveReal(chunk);
 
-        if (fakeManager.shouldBeLoaded(chunkX, chunkZ)) {
+        if (fakeManager.shouldBeLoaded(chunkX, chunkZ))
             chunkReplacements.add(Pair.of(chunkPos, copy));
-        }
-    }
-
-    @Unique
-    private void substituteFakeChunksForUnloadedRealOnes() {
-//        for (Pair<Long, Supplier<WorldChunk>> entry : chunkReplacements) {
-//            long chunkPos = entry.getKey();
-//            fakeChunkManager.load(ChunkPos.getPackedX(chunkPos), ChunkPos.getPackedZ(chunkPos), entry.getValue().get());
-//        }
-//        chunkReplacements.clear();
     }
 
     @Inject(method = "unload", at = @At("HEAD"))
@@ -132,7 +122,8 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
     @Inject(method = { "unload", "setChunkMapCenter", "updateLoadDistance" }, at = @At("RETURN"))
     private void beacon$SubstituteFakeChunksForUnloadedRealOnes(CallbackInfo ci) {
         if (fakeManager == null) return;
-        substituteFakeChunksForUnloadedRealOnes();
+        chunkReplacements.forEach(entry -> fakeManager.loadFake(new ChunkPos(entry.getKey()), entry.getValue().get()));
+        chunkReplacements.clear();
     }
 
     @Inject(method = "getDebugString", at = @At("RETURN"), cancellable = true)
