@@ -1,8 +1,8 @@
 package ppl.beacon.mixin.rander.replacer;
 
 import ppl.beacon.BeaconMod;
+import ppl.beacon.fake.FakeManager;
 import ppl.beacon.fake.chunk.FakeChunk;
-import ppl.beacon.fake.chunk.FakeChunkManager;
 import ppl.beacon.fake.chunk.VisibleChunksTracker;
 import ppl.beacon.fake.ext.ClientChunkManagerExt;
 
@@ -38,7 +38,7 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
     @Shadow private static int getChunkMapRadius(int loadDistance) { throw new AssertionError(); }
 
     @Unique
-    protected FakeChunkManager fakeChunkManager;
+    protected FakeManager fakeManager;
 
     // Tracks which real chunks are visible (whether or not the were actually received), so we can
     // properly unload (i.e. save and replace with fake) them when the server center pos or view distance changes.
@@ -50,8 +50,8 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
     private final List<Pair<Long, Supplier<WorldChunk>>> chunkReplacements = new ArrayList<>();
 
     @Override
-    public FakeChunkManager beacon$getFakeChunkManager() {
-        return fakeChunkManager;
+    public FakeManager beacon$getFakeChunkManager() {
+        return fakeManager;
     }
 
     @Override
@@ -62,7 +62,7 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
     @Inject(method = "<init>", at = @At("RETURN"))
     private void beacon$Init(ClientWorld world, int loadDistance, CallbackInfo ci) {
         if (!BeaconMod.getInstance().isRanderEnabled()) return;
-        fakeChunkManager = new FakeChunkManager(world, (ClientChunkManager) (Object) this);
+        fakeManager = new FakeManager(world, (ClientChunkManager) (Object) this);
         realChunksTracker.update(0, 0, getChunkMapRadius(loadDistance), null, null);
     }
 
@@ -71,27 +71,20 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
         // Did we find a live chunk?
         if (ci.getReturnValue() != (orEmpty ? emptyChunk : null)) return;
 
-        if (fakeChunkManager == null) return;
+        if (fakeManager == null) return;
 
         // Otherwise, see if we've got one
-        WorldChunk chunk = fakeChunkManager.getChunk(x, z);
+        WorldChunk chunk = fakeManager.getChunk(x, z);
         if (chunk != null) ci.setReturnValue(chunk);
     }
 
     @Inject(method = "loadChunkFromPacket", at = @At("HEAD"))
     private void beacon$UnloadFakeChunk(int x, int z, PacketByteBuf buf, NbtCompound nbt, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<WorldChunk> cir) {
-        if (fakeChunkManager == null) return;
+        if (fakeManager == null) return;
 
         // This needs to be called unconditionally because even if there is no chunk loaded at the moment,
         // we might already have one queued which we need to cancel as otherwise it will overwrite the real one later.
-        fakeChunkManager.unload(x, z, true);
-    }
-
-    @Inject(method = "loadChunkFromPacket", at = @At("RETURN"))
-    private void beacon$FingerprintRealChunk(CallbackInfoReturnable<WorldChunk> cir) {
-        if (fakeChunkManager == null) return;
-
-        fakeChunkManager.fingerprint(cir.getReturnValue());
+        fakeManager.unloadFake(x, z, true);
     }
 
     @Unique
@@ -102,49 +95,40 @@ public abstract class ClientChunkManagerMixin implements ClientChunkManagerExt {
         WorldChunk chunk = getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null || chunk instanceof FakeChunk) return;
 
-        Supplier<WorldChunk> copy = fakeChunkManager.saveChunk(new FakeChunk(chunk));
+        Supplier<WorldChunk> copy = fakeManager.saveReal(chunk);
 
-        if (fakeChunkManager.shouldBeLoaded(chunkX, chunkZ)) {
+        if (fakeManager.shouldBeLoaded(chunkX, chunkZ))
             chunkReplacements.add(Pair.of(chunkPos, copy));
-        }
-    }
-
-    @Unique
-    private void substituteFakeChunksForUnloadedRealOnes() {
-//        for (Pair<Long, Supplier<WorldChunk>> entry : chunkReplacements) {
-//            long chunkPos = entry.getKey();
-//            fakeChunkManager.load(ChunkPos.getPackedX(chunkPos), ChunkPos.getPackedZ(chunkPos), entry.getValue().get());
-//        }
-//        chunkReplacements.clear();
     }
 
     @Inject(method = "unload", at = @At("HEAD"))
     private void beacon$SaveChunk(ChunkPos pos, CallbackInfo ci) {
-        if (fakeChunkManager == null) return;
+        if (fakeManager == null) return;
         saveRealChunk(pos.toLong());
     }
 
     @Inject(method = "setChunkMapCenter", at = @At("HEAD"))
     private void beacon$SaveChunksBeforeMove(int x, int z, CallbackInfo ci) {
-        if (fakeChunkManager == null) return;
+        if (fakeManager == null) return;
         realChunksTracker.updateCenter(x, z, this::saveRealChunk, null);
     }
 
     @Inject(method = "updateLoadDistance", at = @At("HEAD"))
     private void beacon$SaveChunksBeforeResize(int loadDistance, CallbackInfo ci) {
-        if (fakeChunkManager == null) return;
+        if (fakeManager == null) return;
         realChunksTracker.updateViewDistance(getChunkMapRadius(loadDistance), this::saveRealChunk, null);
     }
 
     @Inject(method = { "unload", "setChunkMapCenter", "updateLoadDistance" }, at = @At("RETURN"))
     private void beacon$SubstituteFakeChunksForUnloadedRealOnes(CallbackInfo ci) {
-        if (fakeChunkManager == null) return;
-        substituteFakeChunksForUnloadedRealOnes();
+        if (fakeManager == null) return;
+        chunkReplacements.forEach(entry -> fakeManager.loadFake(new ChunkPos(entry.getKey()), entry.getValue().get()));
+        chunkReplacements.clear();
     }
 
     @Inject(method = "getDebugString", at = @At("RETURN"), cancellable = true)
     private void beacon$DebugString(CallbackInfoReturnable<String> cir) {
-        if (fakeChunkManager == null) return;
-        cir.setReturnValue(cir.getReturnValue() + " " + fakeChunkManager.getDebugString());
+        if (fakeManager == null) return;
+        cir.setReturnValue(cir.getReturnValue() + " " + fakeManager.getDebugString());
     }
 }

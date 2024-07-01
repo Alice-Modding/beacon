@@ -169,9 +169,11 @@ public class FakeChunkSerializer extends ChunkSerializer {
         return nbtCompound;
     }
 
-    public static FakeChunk deserialize(ChunkPos pos, NbtCompound nbtCompound, World world) {
+    public static Supplier<WorldChunk> deserialize(ChunkPos pos, NbtCompound nbtCompound, World world) {
         NbtList section = nbtCompound.getList(SECTIONS_KEY, NbtElement.COMPOUND_TYPE);
         ChunkSection[] chunkSections = new ChunkSection[world.countVerticalSections()];
+        ChunkNibbleArray[] blockLight = new ChunkNibbleArray[chunkSections.length + 2];
+        ChunkNibbleArray[] skyLight = new ChunkNibbleArray[chunkSections.length + 2];
 
 
         ChunkPos chunkPos = new ChunkPos(nbtCompound.getInt("xPos"), nbtCompound.getInt("zPos"));
@@ -179,6 +181,7 @@ public class FakeChunkSerializer extends ChunkSerializer {
             LOGGER.error("Chunk file at {} is in the wrong location; relocating. (Expected {}, got {})", pos, pos, chunkPos);
         }
 
+        Arrays.fill(blockLight, COMPLETELY_DARK);
         DynamicRegistryManager registryManager = world.getRegistryManager();
         Registry<Biome> biomeRegistry = registryManager.get(RegistryKeys.BIOME);
         Codec<PalettedContainer<RegistryEntry<Biome>>> biomeCodec = getPalettedBiomCodec(biomeRegistry);
@@ -208,9 +211,39 @@ public class FakeChunkSerializer extends ChunkSerializer {
                 biomes = new PalettedContainer<>(biomeRegistry.getIndexedEntries(), biomeRegistry.entryOf(BiomeKeys.PLAINS), PalettedContainer.PaletteProvider.BIOME);
             }
 
+            if (sectionNbt.contains("BlockLight", NbtElement.BYTE_ARRAY_TYPE)) {
+                blockLight[l + 1] = new ChunkNibbleArray(sectionNbt.getByteArray("BlockLight"));
+            }
+
+            if (sectionNbt.contains("SkyLight", NbtElement.BYTE_ARRAY_TYPE)) {
+                skyLight[l + 1] = new ChunkNibbleArray(sectionNbt.getByteArray("SkyLight"));
+            }
+
             ChunkSection chunkSection = new ChunkSection(blocks, biomes);
             chunkSection.calculateCounts();
             if (!chunkSection.isEmpty()) chunkSections[l] = chunkSection;
+        }
+
+        // The nearest section data read from storage
+        ChunkNibbleArray fullSectionAbove = null;
+        // The nearest section data computed from the one above (based on its bottom-most layer).
+        // May be re-used for multiple sections once computed.
+        ChunkNibbleArray inferredSection = COMPLETELY_LIT;
+        for (int y = skyLight.length - 1; y >= 0; y--) {
+            ChunkNibbleArray skyLightSection = skyLight[y];
+
+            // If we found a section, invalidate our inferred section cache and store it for later
+            if (skyLightSection != null) {
+                inferredSection = null;
+                fullSectionAbove = skyLightSection;
+                continue;
+            }
+
+            // If we are missing a section, infer it from the previous full section (the result of that can be re-used)
+            if (inferredSection == null) {
+                inferredSection = floodSkylightFromAbove(fullSectionAbove);
+            }
+            skyLight[y] = inferredSection;
         }
 
         FakeChunk chunk = new FakeChunk(world, pos, chunkSections);
@@ -235,61 +268,9 @@ public class FakeChunkSerializer extends ChunkSerializer {
                 chunk.addPendingBlockEntityNbt(blockEntitiesTag.getCompound(i));
             }
         }
-        return chunk;
-    }
-
-    public static Supplier<WorldChunk> deserialize(FakeChunk chunk, NbtCompound nbtCompound, World world) {
-        NbtList section = nbtCompound.getList(SECTIONS_KEY, NbtElement.COMPOUND_TYPE);
-        ChunkSection[] chunkSections = new ChunkSection[world.countVerticalSections()];
-        ChunkNibbleArray[] blockLight = new ChunkNibbleArray[chunkSections.length + 2];
-        ChunkNibbleArray[] skyLight = new ChunkNibbleArray[chunkSections.length + 2];
-
-        Arrays.fill(blockLight, COMPLETELY_DARK);
-        for (int i = 0, s = section.size(); i < s; i++) {
-            NbtCompound sectionNbt = section.getCompound(i);
-            int y = sectionNbt.getByte("Y");
-            int l = world.sectionCoordToIndex(y);
-
-            if (l < -1 || l > chunkSections.length) continue;
-
-            if (sectionNbt.contains("BlockLight", NbtElement.BYTE_ARRAY_TYPE)) {
-                blockLight[l + 1] = new ChunkNibbleArray(sectionNbt.getByteArray("BlockLight"));
-            }
-
-            if (sectionNbt.contains("SkyLight", NbtElement.BYTE_ARRAY_TYPE)) {
-                skyLight[l + 1] = new ChunkNibbleArray(sectionNbt.getByteArray("SkyLight"));
-            }
-        }
-
-
-        // Not all light sections are stored. For block light we simply fall back to a completely dark section.
-        // For sky light we need to compute the section based on those above it. We are going top to bottom section.
-
-        // The nearest section data read from storage
-        ChunkNibbleArray fullSectionAbove = null;
-        // The nearest section data computed from the one above (based on its bottom-most layer).
-        // May be re-used for multiple sections once computed.
-        ChunkNibbleArray inferredSection = COMPLETELY_LIT;
-        for (int y = skyLight.length - 1; y >= 0; y--) {
-            ChunkNibbleArray skyLightSection = skyLight[y];
-
-            // If we found a section, invalidate our inferred section cache and store it for later
-            if (skyLightSection != null) {
-                inferredSection = null;
-                fullSectionAbove = skyLightSection;
-                continue;
-            }
-
-            // If we are missing a section, infer it from the previous full section (the result of that can be re-used)
-            if (inferredSection == null) {
-                inferredSection = floodSkylightFromAbove(fullSectionAbove);
-            }
-            skyLight[y] = inferredSection;
-        }
 
         return loadChunk(chunk, blockLight, skyLight);
     }
-
 
     public static Supplier<WorldChunk> loadChunk(
             FakeChunk chunk,

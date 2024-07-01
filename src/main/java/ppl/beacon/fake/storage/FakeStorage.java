@@ -1,4 +1,4 @@
-package ppl.beacon.fake.chunk.storage;
+package ppl.beacon.fake.storage;
 
 import com.mojang.serialization.MapCodec;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -29,7 +29,7 @@ import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.stream.Stream;
 
-import static ppl.beacon.fake.chunk.storage.FakeStorageManager.REGION_FILE_PATTERN;
+import static ppl.beacon.fake.storage.FakeStorageManager.REGION_FILE_PATTERN;
 
 public class FakeStorage extends VersionedChunkStorage {
     private final AtomicBoolean sentUpgradeNotification = new AtomicBoolean();

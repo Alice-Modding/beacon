@@ -1,46 +1,13 @@
 package ppl.beacon;
 
-import ca.stellardrift.confabricate.Confabricate;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.option.SimpleOption;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.Util;
-import net.minecraft.world.chunk.WorldChunk;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.spongepowered.configurate.CommentedConfigurationNode;
-import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
-import org.spongepowered.configurate.reference.ConfigurationReference;
-import org.spongepowered.configurate.reference.ValueReference;
-import org.spongepowered.configurate.reference.WatchServiceListener;
-import ppl.beacon.commands.CreateWorldCommand;
-import ppl.beacon.commands.MergeWorldsCommand;
 import ppl.beacon.commands.UpgradeCommand;
-import ppl.beacon.commands.WorldsCommand;
 import ppl.beacon.config.Config;
-import ppl.beacon.config.ConfigScreenFactory;
 import ppl.beacon.config.RanderConfig;
-import ppl.beacon.fake.chunk.FakeChunk;
-import ppl.beacon.fake.chunk.FakeChunkManager;
-import ppl.beacon.fake.ext.ClientChunkManagerExt;
-import ppl.beacon.fake.world.WorldManager;
-import ppl.beacon.mixin.option.SimpleOptionAccessor;
-import ppl.beacon.mixin.option.ValidatingIntSliderCallbacksAccessor;
 import ppl.beacon.utils.FlawlessFrames;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Stream;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
@@ -67,14 +34,6 @@ public class BeaconMod implements ClientModInitializer {
 
         ClientCommandRegistrationCallback.EVENT.register(((dispatcher, registryAccess) ->
                 dispatcher.register(literal("beacon")
-                        .then(literal("worlds").executes(new WorldsCommand(false))
-                                .then(literal("full").executes(new WorldsCommand(true)))
-                                .then(literal("merge")
-                                        .then(argument("source", integer())
-                                                .then(argument("target", integer())
-                                                        .executes(new MergeWorldsCommand()))))
-                                .then(literal("create").executes(new CreateWorldCommand()))
-                        )
                         .then(literal("upgrade").executes(new UpgradeCommand())))));
 
         FlawlessFrames.onClientInitialization();
